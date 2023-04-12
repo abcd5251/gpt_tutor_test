@@ -2,15 +2,14 @@ import os
 
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from flask import Flask, request, make_response
+
 import uvicorn
 import openai
 from openai_model import Openai_Chat, first_single_response
 
 import pandas as pd 
 
-from flask import Flask, g, request, make_response
-
+from llama_index import GPTSimpleVectorIndex
 from chat import create_llama_index, get_answer_from_llama_index, check_llama_index_exists
 from file import get_index_name_without_json_extension
 from file import get_index_path, get_index_name_from_file_name, check_index_file_exists, \
@@ -53,10 +52,11 @@ async def query_from_llama_index(user_query: str):
 
         index_name = "./documents/data.json"
 
-        if check_index_file_exists(index_name) is False:
+        if os.path.isfile(index_name) is False:
             return "Index file does not exist", 404
-
-        answer = get_answer_from_llama_index(user_query, index_name)
+        
+        index = GPTSimpleVectorIndex.load_from_disk(index_name)
+        answer = index.query(user_query)
         return {"respond" : answer}
     
     except Exception as e:
