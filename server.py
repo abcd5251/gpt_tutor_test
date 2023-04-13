@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import uvicorn
 import openai
-from openai_model import Openai_Chat, first_single_response
+from openai_model import Openai_Chat, first_single_response, simple_reply
 
 import pandas as pd 
 
@@ -73,7 +73,13 @@ async def query_from_keyword(user_query: str, my_chat_model = Depends(get_global
     contexts = list(df["content"])
     answer = my_chat_model(user_query, contexts)
     return {"respond" : answer}
+
+@app.get("/refine_answer")
+async def refine_answer(user_query, full_code, my_chat_model = Depends(get_global_variable)):
+    temp_answer = simple_reply(user_query, full_code)
     
+
+  
 if __name__ == "__main__":
     if not os.path.exists('./documents'):
         os.makedirs('./documents')

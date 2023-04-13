@@ -63,10 +63,32 @@ def first_single_response(question, context, messages :list):
     return answer
 
 # chatgpt answer single reply
-def simple_reply(question):
+def simple_reply(question, code_context):
     messages = []
     messages.append({"role":"system","content": f"I want you to act as a Senior Solidity Developer. I will provide some code about solidity smart contract, and it will be your job to audit provided solidity smart contract code, refine provided smart contract code, and explain the code after the change"})
-    messages.append({"role":"user", "content": f"Please explain {question}, if there is a problem with this solidity code or if there is a security concern, modify this solidity code and explain"})
+    messages.append({"role":"user", "content": f"Here are solidity code : {question}, if there is a problem with this solidity code or if there is a security concern, modify this solidity code and explain why, Here is full code {code_context} if needed"})
+    print("run query")
+    while True:
+                try : 
+                    response = openai.ChatCompletion.create(
+                            model = "gpt-3.5-turbo",
+                            messages = messages,
+                            temperature = 0.5,
+                            max_tokens = 4000
+                        )
+                    break
+                except (RateLimitError, ServiceUnavailableError):
+                        time.sleep(0.1)
+    answer = response.choices[0].message['content']
+    return answer
+
+def refine_reply(question, previous_answer):
+    
+    refine_template=  f"The original question is as follows: {question}\n We have provided an existing answer: {previous_answer}\n We have the opportunity to refine the existing answer (only if needed) with some more context below.\n \
+    {context_msg}\n Given the new context, refine the original answer to better \n answer the question. If the context isn't useful, return the original answer."
+    messages = []
+    messages.append({"role":"system","content": f"I want you to act as a Senior Solidity Developer. I will provide some code about solidity smart contract, and it will be your job to audit provided solidity smart contract code, refine provided smart contract code, and explain the code after the change"})
+    messages.append({"role":"user", "content": f"Here are solidity code : {question}, if there is a problem with this solidity code or if there is a security concern, modify this solidity code and explain why, Here is full code {code_context} if needed"})
     print("run query")
     while True:
                 try : 
