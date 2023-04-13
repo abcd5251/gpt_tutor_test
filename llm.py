@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
-openai.api_key = OPENAI_API_KEY
+#OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+#openai.api_key = OPENAI_API_KEY
 
 llm_predictor = LLMPredictor(llm=ChatOpenAI(
     temperature=0.2, model_name="gpt-3.5-turbo"))
