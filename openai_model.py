@@ -11,9 +11,8 @@ import copy
 from openai.error import RateLimitError, ServiceUnavailableError
 from collections import Counter
 from utils import calculate_cosine
-from dotenv import load_dotenv
-load_dotenv()
 
+"""
 # extract keyword
 def keyword_matching(query_str):
     extract_prompt = [{"role":"system","content": f"You are good at Extract keywords, for example : 我想學習solidity的智能合約與區塊鏈, you will split to : solidity,智能合約,區塊鏈"}]
@@ -81,7 +80,7 @@ def simple_reply(question, code_context, program_language):
                         time.sleep(0.1)
     answer = response.choices[0].message['content']
     return answer
-
+"""
 
 def first_send(question, code_context, program_language):
     messages = []
@@ -113,7 +112,7 @@ def refine_reply(question, contexts, previous_answer):
     messages.append({"role":"user", "content": refine_template})
     print("run query")
     return messages
-
+"""
 class Openai_Chat:
     def __init__(self, model, system_setting, temperature, max_length, top_p, frequency_penalty, presence_penalty, init_prompt, n = 1):
 
@@ -209,4 +208,4 @@ class Openai_Chat:
         
     def get_multiple_response(self,prompts):
         pass
-    
+"""   

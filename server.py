@@ -4,16 +4,8 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
 import uvicorn
-import openai
-from openai_model import Openai_Chat, first_single_response, simple_reply, first_send, refine_reply
 
 import pandas as pd 
-
-from llama_index import GPTSimpleVectorIndex
-from chat import create_llama_index, get_answer_from_llama_index, check_llama_index_exists
-from file import get_index_name_without_json_extension
-from file import get_index_path, get_index_name_from_file_name, check_index_file_exists, \
-    get_index_name_with_json_extension
 
 
 app = FastAPI()
