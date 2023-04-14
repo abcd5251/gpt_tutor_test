@@ -1,0 +1,1156 @@
+event,content_url,content
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/general-philosophy/prepare-for-failure,"
+Any non-trivial contract will have errors in it. Your code must, therefore, be able to respond to
+bugs and vulnerabilities gracefully.
+
+Pause the contract when things are going wrong ('circuit breaker')
+Manage the amount of money at risk (rate limiting, maximum usage)
+Have an effective upgrade path for bugfixes and improvements
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/general-philosophy/stay-up-to-date,"
+Keep track of new security developments.
+
+Check your contracts for any new bug as soon as it is discovered
+Upgrade to the latest version of any tool or library as soon as possible
+Adopt new security techniques that appear useful
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/general-philosophy/simplicity,"
+Complexity increases the likelihood of errors.
+
+Ensure the contract logic is simple
+Modularize code to keep contracts and functions small
+Use already-written tools or code where possible (eg. don't roll your own random number
+  generator)
+Prefer clarity to performance whenever possible
+Only use the blockchain for the parts of your system that require decentralization
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/general-philosophy/rollout,"
+It is always better to catch bugs before a full production release.
+
+Test contracts thoroughly, and add tests whenever new attack vectors are discovered
+Provide bug bounties starting from alpha testnet
+  releases
+Rollout in phases, with increasing usage and testing in each phase
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/general-philosophy/blockchain-properties,"
+While much of your programming experience will be relevant to Ethereum programming, there are some
+pitfalls to be aware of.
+
+Be extremely careful about external contract calls, which may execute malicious code and change
+  control flow.
+Understand that your public functions are public, and may be called maliciously and in any order.
+  The private data in smart contracts is also viewable by anyone.
+Keep gas costs and the block gas limit in mind.
+Be aware that timestamps are imprecise on a blockchain, miners can influence the time of
+  execution of a transaction within a margin of several seconds.
+Randomness is non-trivial on blockchain, most approaches to random number generation are gameable
+  on a blockchain.
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/general-philosophy/external-calls,"
+404 - Not found
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/general-philosophy/simplicity-vs-complexity,"
+Simplicity vs. Complexity
+There are multiple fundamental tradeoffs to consider when assessing the structure and security of a
+smart contract system. The general recommendation for any smart contract system is to identify the
+proper balance for these fundamental tradeoffs.
+An ideal smart contract system from a software engineering bias is modular, reuses code instead of
+duplicating it, and supports upgradeable components. An ideal smart contract system from a secure
+architecture bias may share this mindset, especially in the case of more complex smart contract
+systems.
+However, there are important exceptions where security and software engineering best practices may
+not be aligned. In each case, the proper balance is obtained by identifying the optimal mix of
+properties along contract system dimensions such as:
+
+Rigid versus Upgradeable
+Monolithic versus Modular
+Duplication versus Reuse
+
+Rigid versus Upgradeable¶
+While multiple resources, including this one, emphasize malleability characteristics such as
+Killable, Upgradeable or Modifiable patterns there is a fundamental tradeoff between malleability
+and security.
+Malleability patterns by definition add complexity and potential attack surfaces. Simplicity is
+particularly effective over complexity in cases where the smart contract system performs a very
+limited set of functionality for a pre-defined limited period of time, for example, a
+governance-free finite-time-frame token-sale contract system.
+Monolithic versus Modular¶
+A monolithic self-contained contract keeps all knowledge locally identifiable and readable. While
+there are few smart contract systems held in high regard that exist as monoliths, there is an
+argument to be made for extreme locality of data and flow - for example, in the case of optimizing
+code review efficiency.
+As with the other tradeoffs considered here, security best practices trend away from software
+engineering best practices in simple short-lived contracts and trend toward software engineering
+best practices in the case of more complex perpetual contract systems.
+Duplication versus Reuse¶
+A smart contract system from a software engineering perspective wishes to maximize reuse where
+reasonable. There are many ways to reuse contract code in Solidity. Using proven
+previously-deployed contracts which you own is generally the safest manner to achieve code reuse.
+Duplication is frequently relied upon in cases where self-owned previously-deployed contracts are
+not available. Efforts such as
+OpenZeppelin's Solidity Library seek to
+provide patterns such that secure code can be re-used without duplication. Any contract security
+analysis must include any re-used code that has not previously established a level of trust
+commensurate with the funds at risk in the target smart contract system.
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/development-recommendations/general/external-calls/,"
+External Calls
+Use caution when making external calls¶
+Calls to untrusted contracts can introduce several unexpected risks or errors. External calls may
+execute malicious code in that contract or any other contract that it depends upon. As such,
+every external call should be treated as a potential security risk. When it is not possible, or
+undesirable to remove external calls, use the recommendations in the rest of this section to
+minimize the danger.
+
+Mark untrusted contracts¶
+When interacting with external contracts, name your variables, methods, and contract interfaces in
+a way that makes it clear that interacting with them is potentially unsafe. This applies to your
+own functions that call external contracts.
+// bad
+Bank.withdraw(100); // Unclear whether trusted or untrusted
+
+function makeWithdrawal(uint amount) { // Isn't clear that this function is potentially unsafe
+    Bank.withdraw(amount);
+}
+
+// good
+UntrustedBank.withdraw(100); // untrusted external call
+TrustedBank.withdraw(100); // external but trusted bank contract maintained by XYZ Corp
+
+function makeUntrustedWithdrawal(uint amount) {
+    UntrustedBank.withdraw(amount);
+}
+
+
+Avoid state changes after external calls¶
+Whether using raw calls (of the form someAddress.call()) or contract calls (of the form
+ExternalContract.someMethod()), assume that malicious code might execute. Even if
+ExternalContract is not malicious, malicious code can be executed by any contracts it calls.
+One particular danger is malicious code may hijack the control flow, leading to vulnerabilities due
+to reentrancy. (See Reentrancy for a fuller discussion of this
+problem).
+If you are making a call to an untrusted external contract, avoid state changes after the call.
+This pattern is also sometimes known as the
+checks-effects-interactions pattern.
+See SWC-107
+
+Don't use transfer() or send().¶
+.transfer() and .send() forward exactly 2,300 gas to the recipient. The goal of this hardcoded
+gas stipend was to prevent reentrancy vulnerabilities, but this only
+makes sense under the assumption that gas costs are constant. Recently
+EIP 1884 was included in the Istanbul hard fork. One of
+the changes included in EIP 1884 is an increase to the gas cost of the SLOAD operation, causing a
+contract's fallback function to cost more than 2300 gas.
+It's recommended to stop using .transfer() and .send() and instead use .call().
+// bad
+contract Vulnerable {
+    function withdraw(uint256 amount) external {
+        // This forwards 2300 gas, which may not be enough if the recipient
+        // is a contract and gas costs change.
+        msg.sender.transfer(amount);
+    }
+}
+
+// good
+contract Fixed {
+    function withdraw(uint256 amount) external {
+        // This forwards all available gas. Be sure to check the return value!
+        (bool success, ) = msg.sender.call.value(amount)("""");
+        require(success, ""Transfer failed."");
+    }
+}
+
+Note that .call() does nothing to mitigate reentrancy attacks, so other precautions must be
+taken. To prevent reentrancy attacks, it is recommended that you use the
+checks-effects-interactions pattern.
+
+Handle errors in external calls¶
+Solidity offers low-level call methods that work on raw addresses: address.call(),
+address.callcode(), address.delegatecall(), and address.send(). These low-level methods never
+throw an exception, but will return false if the call encounters an exception. On the other hand,
+contract calls (e.g., ExternalContract.doSomething()) will automatically propagate a throw (for
+example, ExternalContract.doSomething() will also throw if doSomething() throws).
+If you choose to use the low-level call methods, make sure to handle the possibility that the call
+will fail, by checking the return value.
+// bad
+someAddress.send(55);
+someAddress.call.value(55)(""""); // this is doubly dangerous, as it will forward all remaining gas and doesn't check for result
+someAddress.call.value(100)(bytes4(sha3(""deposit()""))); // if deposit throws an exception, the raw call() will only return false and transaction will NOT be reverted
+
+// good
+(bool success, ) = someAddress.call.value(55)("""");
+if(!success) {
+    // handle failure code
+}
+
+ExternalContract(someAddress).deposit.value(100)();
+
+See SWC-104
+
+Favor pull over push for external calls¶
+External calls can fail accidentally or deliberately. To minimize the damage caused by such
+failures, it is often better to isolate each external call into its own transaction that can be
+initiated by the recipient of the call. This is especially relevant for payments, where it is
+better to let users withdraw funds rather than push funds to them automatically. (This also reduces
+the chance of problems with the gas limit.) Avoid
+combining multiple ether transfers in a single transaction.
+// bad
+contract auction {
+    address highestBidder;
+    uint highestBid;
+
+    function bid() payable {
+        require(msg.value >= highestBid);
+
+        if (highestBidder != address(0)) {
+            (bool success, ) = highestBidder.call.value(highestBid)("""");
+            require(success); // if this call consistently fails, no one else can bid
+        }
+
+       highestBidder = msg.sender;
+       highestBid = msg.value;
+    }
+}
+
+// good
+contract auction {
+    address highestBidder;
+    uint highestBid;
+    mapping(address => uint) refunds;
+
+    function bid() payable external {
+        require(msg.value >= highestBid);
+
+        if (highestBidder != address(0)) {
+            refunds[highestBidder] += highestBid; // record the refund that this user can claim
+        }
+
+        highestBidder = msg.sender;
+        highestBid = msg.value;
+    }
+
+    function withdrawRefund() external {
+        uint refund = refunds[msg.sender];
+        refunds[msg.sender] = 0;
+        (bool success, ) = msg.sender.call.value(refund)("""");
+        require(success);
+    }
+}
+
+See SWC-128
+
+Don't delegatecall to untrusted code¶
+The delegatecall function is used to call functions from other contracts as if they belong to the
+caller contract. Thus the callee may change the state of the calling address. This may be insecure.
+An example below shows how using delegatecall can lead to the destruction of the contract and
+loss of its balance.
+contract Destructor
+{
+    function doWork() external
+    {
+        selfdestruct(0);
+    }
+}
+
+contract Worker
+{
+    function doWork(address _internalWorker) public
+    {
+        // unsafe
+        _internalWorker.delegatecall(bytes4(keccak256(""doWork()"")));
+    }
+}
+
+If Worker.doWork() is called with the address of the deployed Destructor contract as an
+argument, the Worker contract will self-destruct. Delegate execution only to trusted contracts,
+and never to a user supplied address.
+
+Warning
+Don't assume contracts are created with zero balance.  An attacker can send ether to the
+address of a contract before it is created so contracts should not assume that their initial state
+contains a zero balance. See
+issue 61 for more details.
+See SWC-112
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/development-recommendations/precautions/general,"
+As we discussed in the General Philosophy section, it is not enough to
+protect yourself against the known attacks. Since the cost of failure on a blockchain can be very
+high, you must also adapt the way you write software, to account for that risk.
+The approach we advocate is to ""prepare for failure"". It is impossible to know in advance whether
+your code is secure. However, you can architect your contracts in a way that allows them to fail
+gracefully, and with minimal damage. This section presents a variety of techniques that will help
+you prepare for failure.
+Note: There's always a risk when you add a new component to your system. A badly designed fail-safe
+could itself become a vulnerability, as can the interaction between a number of well-designed
+fail-safes. Be thoughtful about each technique you use in your contracts, and consider carefully
+how they work together to create a robust system.
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/development-recommendations/solidity-specific/assert-require-revert,"
+Assert, Require, Revert
+Enforce invariants with assert()¶
+An assert guard triggers when an assertion fails - such as an invariant property changing. For
+example, the token to ether issuance ratio, in a token issuance contract, may be fixed. You can
+verify that this is the case at all times with an assert(). Assert guards should often be
+combined with other techniques, such as pausing the contract and allowing upgrades. (Otherwise, you
+may end up stuck, with an assertion that is always failing.)
+Example:
+contract Token {
+    mapping(address => uint) public balanceOf;
+    uint public totalSupply;
+
+    function deposit() public payable {
+        balanceOf[msg.sender] += msg.value;
+        totalSupply += msg.value;
+        assert(address(this).balance >= totalSupply);
+    }
+}
+
+Note that the assertion is not a strict equality of the balance because the contract can be
+forcibly sent ether without going
+through the deposit() function!
+Use assert(), require(), revert() properly¶
+
+Info
+The convenience functions assert and require can be used to check for conditions and throw an exception if the condition is not met.
+
+The assert function should only be used to test for internal errors, and to check invariants.
+The require function should be used to ensure valid conditions, such as inputs, or contract state variables are met, or to validate return values from calls to external contracts.
+Following this paradigm allows formal analysis tools to verify that the invalid opcode can never be
+reached: meaning no invariants in the code are violated and that the code is formally verified.
+pragma solidity ^0.5.0;
+
+contract Sharer {
+    function sendHalf(address payable addr) public payable returns (uint balance) {
+        require(msg.value % 2 == 0, ""Even value required.""); //Require() can have an optional message string
+        uint balanceBeforeTransfer = address(this).balance;
+        (bool success, ) = addr.call.value(msg.value / 2)("""");
+        require(success);
+        // Since we reverted if the transfer failed, there should be
+        // no way for us to still have half of the money.
+        assert(address(this).balance == balanceBeforeTransfer - msg.value / 2); // used for internal error checking
+        return address(this).balance;
+    }
+}
+
+See SWC-110 & SWC-123
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/development-recommendations/token-specific/standardization,"
+Generally speaking, smart contracts of tokens should follow an accepted and stable standard.
+Examples of currently accepted standards include:
+
+EIP20
+EIP721 (non-fungible token)
+More at eips.ethereum.org
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/development-recommendations/documentation/general,"
+When launching a contract that will have substantial funds or is required to be mission critical,
+it is important to include proper documentation.
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/development-recommendations/deprecated/division-by-zero,"
+Prior to version 0.4, Solidity returns zero and
+does not throw an exception when a number is divided by zero. Ensure you're running at least
+version 0.4.
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/attacks/reentrancy/,"
+Reentrancy
+One of the major dangers of calling external contracts is that
+they can take over the control flow, and make changes to your data that the calling function wasn't
+expecting. This class of bugs can take many forms, and both of the major bugs that led to the DAO's
+collapse were bugs of this sort.
+Reentrancy on a Single Function¶
+The first version of this bug to be noticed involved functions that could be called repeatedly,
+before the first invocation of the function was finished. This may cause the different invocations
+of the function to interact in destructive ways.
+// INSECURE
+mapping (address => uint) private userBalances;
+
+function withdrawBalance() public {
+    uint amountToWithdraw = userBalances[msg.sender];
+    (bool success, ) = msg.sender.call.value(amountToWithdraw)(""""); // At this point, the caller's code is executed, and can call withdrawBalance again
+    require(success);
+    userBalances[msg.sender] = 0;
+}
+
+Since the user's balance is not set to 0 until the very end of the function, the second (and later)
+invocations will still succeed and will withdraw the balance over and over again.
+
+Factoid
+A DAO is a Decentralized Autonomous Organization. Its goal is to codify the rules and
+decision-making apparatus of an organization, eliminating the need for documents and people in
+governing, creating a structure with decentralized control.
+
+On June 17th 2016, The DAO was hacked and 3.6 million Ether ($50 Million) were stolen using the first reentrancy attack.
+Ethereum Foundation issued a critical update to rollback the hack. This resulted in Ethereum being forked into Ethereum Classic and Ethereum.
+In the example given, the best way to prevent this attack is to make sure you don't call an
+external function until you've done all the internal work you need to do:
+mapping (address => uint) private userBalances;
+
+function withdrawBalance() public {
+    uint amountToWithdraw = userBalances[msg.sender];
+    userBalances[msg.sender] = 0;
+    (bool success, ) = msg.sender.call.value(amountToWithdraw)(""""); // The user's balance is already 0, so future invocations won't withdraw anything
+    require(success);
+}
+
+Note that if you had another function which called withdrawBalance(), it would be potentially
+subject to the same attack, so you must treat any function which calls an untrusted contract as
+itself untrusted. See below for further discussion of potential solutions.
+Cross-function Reentrancy¶
+An attacker may also be able to do a similar attack using two different functions that share the
+same state.
+// INSECURE
+mapping (address => uint) private userBalances;
+
+function transfer(address to, uint amount) {
+    if (userBalances[msg.sender] >= amount) {
+       userBalances[to] += amount;
+       userBalances[msg.sender] -= amount;
+    }
+}
+
+function withdrawBalance() public {
+    uint amountToWithdraw = userBalances[msg.sender];
+    (bool success, ) = msg.sender.call.value(amountToWithdraw)(""""); // At this point, the caller's code is executed, and can call transfer()
+    require(success);
+    userBalances[msg.sender] = 0;
+}
+
+In this case, the attacker calls transfer() when their code is executed on the external call in
+withdrawBalance. Since their balance has not yet been set to 0, they are able to transfer the
+tokens even though they already received the withdrawal. This vulnerability was also used in the
+DAO attack.
+The same solutions will work, with the same caveats. Also note that in this example, both functions
+were part of the same contract. However, the same bug can occur across multiple contracts, if those
+contracts share state.
+Pitfalls in Reentrancy Solutions¶
+Since reentrancy can occur across multiple functions, and even multiple contracts, any solution
+aimed at preventing reentrancy with a single function will not be sufficient.
+Instead, we have recommended finishing all internal work (ie. state changes) first, and only then
+calling the external function. This rule, if followed carefully, will allow you to avoid
+vulnerabilities due to reentrancy. However, you need to not only avoid calling external functions
+too soon, but also avoid calling functions which call external functions. For example, the
+following is insecure:
+// INSECURE
+mapping (address => uint) private userBalances;
+mapping (address => bool) private claimedBonus;
+mapping (address => uint) private rewardsForA;
+
+function withdrawReward(address recipient) public {
+    uint amountToWithdraw = rewardsForA[recipient];
+    rewardsForA[recipient] = 0;
+    (bool success, ) = recipient.call.value(amountToWithdraw)("""");
+    require(success);
+}
+
+function getFirstWithdrawalBonus(address recipient) public {
+    require(!claimedBonus[recipient]); // Each recipient should only be able to claim the bonus once
+
+    rewardsForA[recipient] += 100;
+    withdrawReward(recipient); // At this point, the caller will be able to execute getFirstWithdrawalBonus again.
+    claimedBonus[recipient] = true;
+}
+
+Even though getFirstWithdrawalBonus() doesn't directly call an external contract, the call in
+withdrawReward() is enough to make it vulnerable to a reentrancy. You therefore need to treat
+withdrawReward() as if it were also untrusted.
+mapping (address => uint) private userBalances;
+mapping (address => bool) private claimedBonus;
+mapping (address => uint) private rewardsForA;
+
+function untrustedWithdrawReward(address recipient) public {
+    uint amountToWithdraw = rewardsForA[recipient];
+    rewardsForA[recipient] = 0;
+    (bool success, ) = recipient.call.value(amountToWithdraw)("""");
+    require(success);
+}
+
+function untrustedGetFirstWithdrawalBonus(address recipient) public {
+    require(!claimedBonus[recipient]); // Each recipient should only be able to claim the bonus once
+
+    claimedBonus[recipient] = true;
+    rewardsForA[recipient] += 100;
+    untrustedWithdrawReward(recipient); // claimedBonus has been set to true, so reentry is impossible
+}
+
+In addition to the fix making reentry impossible,
+untrusted functions have been marked. This same
+pattern repeats at every level: since untrustedGetFirstWithdrawalBonus() calls
+untrustedWithdrawReward(), which calls an external contract, you must also treat
+untrustedGetFirstWithdrawalBonus() as insecure.
+Another solution often suggested is a mutex. This
+allows you to ""lock"" some state so it can only be changed by the owner of the lock. A simple
+example might look like this:
+// Note: This is a rudimentary example, and mutexes are particularly useful where there is substantial logic and/or shared state
+mapping (address => uint) private balances;
+bool private lockBalances;
+
+function deposit() payable public returns (bool) {
+    require(!lockBalances);
+    lockBalances = true;
+    balances[msg.sender] += msg.value;
+    lockBalances = false;
+    return true;
+}
+
+function withdraw(uint amount) payable public returns (bool) {
+    require(!lockBalances && amount > 0 && balances[msg.sender] >= amount);
+    lockBalances = true;
+
+    (bool success, ) = msg.sender.call.value(amount)("""");
+
+    if (success) { // Normally insecure, but the mutex saves it
+      balances[msg.sender] -= amount;
+    }
+
+    lockBalances = false;
+    return true;
+}
+
+If the user tries to call withdraw() again before the first call finishes, the lock will prevent
+it from having any effect. This can be an effective pattern, but it gets tricky when you have
+multiple contracts that need to cooperate. The following is insecure:
+// INSECURE
+contract StateHolder {
+    uint private n;
+    address private lockHolder;
+
+    function getLock() {
+        require(lockHolder == address(0));
+        lockHolder = msg.sender;
+    }
+
+    function releaseLock() {
+        require(msg.sender == lockHolder);
+        lockHolder = address(0);
+    }
+
+    function set(uint newState) {
+        require(msg.sender == lockHolder);
+        n = newState;
+    }
+}
+
+An attacker can call getLock(), and then never call releaseLock(). If they do this, then the
+contract will be locked forever, and no further changes will be able to be made. If you use mutexes
+to protect against reentrancy, you will need to carefully ensure that there are no ways for a lock
+to be claimed and never released. (There are other potential dangers when programming with mutexes,
+such as deadlocks and livelocks. You should consult the large amount of literature already written
+on mutexes, if you decide to go this route.)
+See SWC-107
+
+Above were examples of reentrancy involving the attacker executing malicious code within a single
+transaction. The following are a different type of attack inherent to Blockchains: the fact that
+the order of transactions themselves (e.g. within a block) is easily subject to manipulation.
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/attacks/oracle-manipulation/,"
+Oracle Manipulation
+Protocols sometimes require additional information from outside the realm of the blockchain to function correctly.
+Such off-chain information is provided by oracles, which often are smart contracts themselves.
+A vulnerability arises when protocols relying on oracles automatically execute actions even though the oracle-provided data feed is incorrect.
+An oracle with deprecated or even malicious contents can have disastrous effects on all processes connected to the data feed.
+In practice, manipulated data feeds can cause significant damage, from unwarranted liquidations to malicious arbitrage trades.
+The following sections provide examples illustrating common vulnerabilities and malfunctions involving oracles.
+Spot Price Manipulation¶
+A classic vulnerability comes from the world of on-chain price oracles: Trusting the spot price of a decentralized exchange.
+The scenario is simple. A smart contract needs to determine the price of an asset, e.g., when a user deposits ETH into its system.
+To achieve this price discovery, the protocol consults its respective Uniswap pool as a source.
+Exploiting this behavior, an attacker can take out a flash loan to drain one side of the Uniswap pool.
+Due to the lack of data source diversity, the protocol's internal price is directly manipulated, e.g., to 100 times the original value.
+The attacker can now perform an action to capture this additional value.
+For example, an arbitrage trade on top of the newly created price difference or an advantageous position in the system can be gained.
+The problems are two-fold:
+
+The use of a single price feed source smart contract allows for easy on-chain manipulation using flash loans.
+Despite a notable anomaly, the smart contracts consuming the price information continue to operate on the manipulated data.
+
+A more concrete example is provided by the Visor Hack.
+The following code shows that on deposit, the price feed is fetched directly from Uniswap:
+uint160 sqrtPrice = TickMath.getSqrtRatioAtTick(currentTick());
+uint256 price = FullMath.mulDiv(uint256(sqrtPrice).mul(uint256(sqrtPrice)), PRECISION, 2**(96 * 2));
+
+Here, currentTick() directly fetches the current price tick from a Uniswap pool:
+// @return tick Uniswap pool's current price tick
+function currentTick() public view returns (int24 tick) {
+    (, tick, , , , , ) = pool.slot0();
+}
+
+As this price data is fetched from an on-chain dependency, and the price data is determined in the current transaction context, this spot price can be manipulated in the same transaction.
+
+An attacker can take out a flash loan on the incoming asset A and on the relevant Uniswap pool, swap asset A for asset B with a large volume.
+This trade will increase the price of asset B (increased demand) and reduce the cost of asset A (increased supply).
+When asset B is deposited into the above function, its price is still pumped up by the flash loan.
+Consequentially, asset B gives the attacker an over-proportional amount of shares.
+These shares can be withdrawn, giving the attacker equal parts of asset A and asset B from the pool.
+Repeating this process will drain the vulnerable pool of all funds.
+With the money gained from the withdrawal of their shares, the attacker can repay the flash loan.
+
+
+Warning
+Under no circumstances should a decentralized exchange's spot price be used directly for price discovery.
+Secure price calculation can be performed, e.g., by using time-weighted average prices (TWAPs) across longer time intervals.
+Assuming sufficient liquidity, this severely increases the cost of a price manipulation attack, making it unfeasible.
+An example for facilitating secure price discovery is the Uniswap V3 OracleLibrary docs.
+
+Off-Chain Infrastructure¶
+By definition, a data feed transporting off-chain information into a smart contract requires traditional software to run.
+From the sensor hardware or manual entry to authenticated APIs submitting data on-chain, it is not uncommon for a plethora of software to be involved.
+Depending on the concrete implementation, attacks on access control, cryptographic implementation, transport, and database security, among others, can be performed.
+As a result, software providing oracle services must be hardened and adhere to security best practices such as the OWASP Secure Coding Practices.
+Especially oracles which don't offer a community-driven dispute phase must be hardened as their compromise will directly affect dependent applications.
+
+Info
+Eskandari et al. divided the concept of an oracle into the following six modules:
+
+Ground Truth
+Data Sources
+Data Feeders
+Selection of Data Feeders
+Aggregation
+Dispute Phase
+
+Their publication provides a great read on design principles, attacks, and mitigations.
+Shayan Eskandari, Mehdi Salehi, Wanyun Catherine Gu, and Jeremy Clark. 2021.
+SoK: oracles from the ground truth to market manipulation.
+Proceedings of the 3rd ACM Conference on Advances in Financial Technologies.
+Association for Computing Machinery, New York, NY, USA, 127–141.
+DOI:https://doi.org/10.1145/3479722.3480994
+
+
+An excellent example of an off-chain component malfunction affecting on-chain oracle data feeds is the Synthetix sKRW incident.
+Synthetix aggregates multiple related price-feeds to accurately price their derivatives and surfaces the aggregate through a smart contract on-chain.
+With a value erroneously reported 1000 times higher than the original, the price of the Korean Won was reported significantly higher, even though the aggregation.
+An arbitrage bot used this effect, which promptly earned it a profit of over 1B USD.
+While on-chain aggregation and price reporting worked correctly, an off-chain component failure resulted in the incident.
+
+Info
+samczsun wrote a great article on the Paradigm blog elaborating this incident and various other price oracle related incidents.
+
+Centralized Oracles and Trust¶
+Projects can also choose to implement a centralized oracle.
+Such a smart contract's update method can, e.g., be protected by an onlyOwner modifier and require users to trust in the correct and timely submission of data.
+Depending on the size and structure of the system, this centralized trust can lead to the authorized user(s) getting incentivized to submit malicious data and abuse their position of power.
+Additionally, such centralized systems can have an inherent risk due to compromised private keys.
+Decentralized Oracle Security¶
+Decentralized oracles aim to diversify the group of data collectors to a point where disrupting a quorum of participants becomes unfeasible for an attacker.
+In a decentralized scenario, further security considerations stem from how participants are incentivized and what sort of misbehavior if left unpunished.
+Participants providing (valid) data to the oracle system are economically rewarded.
+Aiming to maximize their profit, the participants are incentivized to provide the cheapest version of their service possible.
+Freeloading¶
+Freeloading attacks are the simplest form to save work and maximize profit.
+A node can leverage another oracle or off-chain component (such as an API) and simply copy the values without validation.
+For example, an oracle providing weather data might expect data providers to measure temperature and wind speed in a specific location.
+Nodes are, however, incentivized to use a publicly available weather data API and simply surface their data to the system.
+Besides the apparent data source centralization issue, freeloading attacks at scale can also severely affect the data's correctness.
+This effect is most visible when sampling rates vary, e.g., the on-chain oracle expects a sampling rate of 10 minutes while freeloading nodes provide data from an API that is updated once every hour.
+Freeloading in decentralized oracle data marketplaces can amplify a price race to the bottom as freeloading only requires a simple lookup. At the same time, proper data provisioning might involve a more significant computational overhead.
+With less competition in cheaper price ranges, a few freeloading nodes could even be able to take over a data feed.
+Freeloading attacks can be easily prevented for more complex data feeds by implementing a commit-reveal scheme.
+This security measure will prevent oracle system participants from peeking into each other's data.
+For simpler data provisioning, consistency checks punishing nodes that obviously copy data from well-known public services can be implemented.
+Data collectors contributing to the centralization of the overall service will be disincentivized.
+Mirroring¶
+Mirroring attacks are a flavor of Sybil attacks and can go hand-in-hand with freeloading.
+Similarly, misbehaving nodes aim to save work by reading from a centralized data source, optionally with a reduced sampling rate.
+A single node reading from the centralized data source then replicates its values across other participants who mirror that data.
+With a single data read, the reward for providing the information is multiplied by the number of participants.
+As the number of mirroring participants grows, this increased weight on a single data point can significantly deteriorate error correction mechanisms.
+A similar outcome to a mirroring attack can happen accidentally when a large, uninformed part of a community relies on a single data source.
+A commit-reveal scheme is ineffective to mitigate (purposeful) mirroring attacks as it does not consider private data transfers between Sybil nodes.
+Due to the lack of transparency in Sybil communications, mirroring attacks can be very hard to detect in practice.
+Solutions¶
+Currently, the easiest ways to solve the oracle problem are decentralized oracles, such as:
+
+Chainlink is the largest decentralized oracle provider, and the Chainlink network can be leveraged to bring decentralized data on-chain.
+Tellor is an oracle that provides censorship-resistant data, secured by economic incentives, ensuring data can be provided by anyone, anytime, and checked by everyone.
+Witnet leverages state-of-the-art cryptographic and economic incentives to provide smart contracts with off-chain data.
+
+Using a median of multiple oracles provides heightened security since it is harder and more expensive to attack various oracles.
+It also ensures that a smart contract gets the data it needs even if one oracle or API call fails. 
+Another standard solution is to use a time-weighted average price feed so that price is averaged out
+over X periods and multiple sources.
+Not only does this prevent oracle manipulation, but it also reduces the chance you can be front-run, as an order executed right before cannot have as drastic of an impact on the price.
+This condition does not apply for low liquidity assets, which are generally cheaper to manipulate, even for a prolonged time.
+Uniswap v2 provides a sliding window example.
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/attacks/frontrunning,"
+Frontrunning
+Since all transactions are visible in the mempool for a short while before being executed,
+observers of the network can see and react to an action before it is included in a block. An
+example of how this can be exploited is with a decentralized exchange where a buy order transaction
+can be seen, and second order can be broadcast and executed before the first transaction is
+included. Protecting against this is difficult, as it would come down to the specific contract
+itself.
+Front-running, coined originally for traditional financial markets, is the race to order the chaos
+to the winner's benefit. In financial markets, the flow of information gave birth to intermediaries
+that could simply profit by being the first to know and react to some information. These attacks
+mostly had been within stock market deals and early domain registries, such as whois gateways.
+
+front-run·ning (/ˌfrəntˈrəniNG/)
+noun: front-running;
+
+
+STOCK MARKET
+
+the practice by market makers of dealing on advance information provided by their brokers and investment analysts, before their clients have been given the information.
+
+
+
+
+
+Taxonomy¶
+By defining a taxonomy and differentiating each group from
+another, we can make it easier to discuss the problem and find solutions for each group.
+We define the following categories of front-running attacks:
+
+Displacement
+Insertion
+Suppression
+
+Displacement¶
+In the first type of attack, a displacement attack, it is not important for Alice’s (User)
+function call to run after Mallory (Adversary) runs her function. Alice’s can be orphaned or run
+with no meaningful effect. Examples of displacement include:
+
+Alice trying to register a domain name and Mallory registering it first;
+Alice trying to submit a bug to receive a bounty and Mallory stealing it and submitting it first;
+Alice trying to submit a bid in an auction and Mallory copying it.
+
+This attack is commonly performed by increasing the gasPrice higher than network average, often
+by a multiplier of 10 or more.
+Insertion¶
+For this type of attack, it is important to the adversary that the original function call runs
+after her transaction. In an insertion attack, after Mallory runs her function, the state of the
+contract is changed and she needs Alice’s original function to run on this modified state. For
+example, if Alice places a purchase order on a blockchain asset at a higher price than the best
+offer, Mallory will insert two transactions: she will purchase at the best offer price and then
+offer the same asset for sale at Alice’s slightly higher purchase price. If Alice’s transaction is
+then run after, Mallory will profit on the price difference without having to hold the asset.
+As with displacement attacks, this is usually done by outbidding Alice's transaction in the gas
+price auction.
+
+Transaction Order Dependence
+Transaction Order Dependence is equivalent to race
+condition in smart contracts. An example, if one function sets the reward percentage, and the
+withdraw function uses that percentage; then withdraw transaction can be front-run by a change
+reward function call, which impacts the amount that will be withdrawn eventually.
+See SWC-114
+
+
+
+Suppression¶
+In a suppression attack, a.k.a Block Stuffing attacks, after Mallory runs her function, she tries
+to delay Alice from running her function.
+This was the case with the first winner of the ""Fomo3d"" game and some other on-chain hacks. The
+attacker sent multiple transactions with a high gasPrice and gasLimit to custom smart contracts
+that assert (or use other means) to consume all the gas and fill up the block's gasLimit.
+
+Variants
+Each of these attacks has two variants, asymmetric and bulk.
+In some cases, Alice and Mallory are performing different operations. For example, Alice is trying to cancel an offer, and Mallory is trying to fulfill it first. We call this asymmetric displacement. In other cases, Mallory is trying to run a large set of functions: for example, Alice and others are trying to buy a limited set of shares offered by a firm on a blockchain. We call this bulk displacement.
+
+Mitigations¶
+Front-running is a pervasive issue on public blockchains such as Ethereum.
+The best remediation is to remove the benefit of front-running in your application, mainly by
+removing the importance of transaction ordering or time. For example, in markets, it would be
+better to implement batch auctions (this also protects against high-frequency trading concerns).
+Another way is to use a pre-commit scheme (“I’m going to submit the details later”). A third option
+is to mitigate the cost of front-running by specifying a maximum or minimum acceptable price range
+on a trade, thereby limiting price slippage.
+Transaction Ordering: Go-Ethereum (Geth) nodes order the transactions based on their
+gasPrice and address nonce. This, however, results in a gas auction between participants in the
+network to get included in the block currently being mined.
+Confidentiality: Another approach is to limit the visibility of the transactions, this can be
+done using a ""commit and reveal"" scheme.
+
+A simple implementation is to store the keccak256 hash of the data in the first transaction, then
+reveal the data and verify it against the hash in the second transaction. However note that the
+transaction itself leaks the intention and possibly the value of the collateralization. There are
+enhanced commit and reveal schemes that are more secure, however require more transactions to
+function, e.g. submarine sends.
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/attacks/timestamp-dependence/,"
+Be aware that the timestamp of the block can be manipulated by the miner, and all direct and
+indirect uses of the timestamp should be considered.
+
+Note
+See the Recommendations section for design
+considerations related to Timestamp Dependence.
+See SWC-116
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/attacks/insecure-arithmetic/,"
+Consider a simple token transfer:
+mapping (address => uint256) public balanceOf;
+
+// INSECURE
+function transfer(address _to, uint256 _value) {
+    /* Check if sender has balance */
+    require(balanceOf[msg.sender] >= _value);
+    /* Add and subtract new balances */
+    balanceOf[msg.sender] -= _value;
+    balanceOf[_to] += _value;
+}
+
+// SECURE
+function transfer(address _to, uint256 _value) {
+    /* Check if sender has balance and for overflows */
+    require(balanceOf[msg.sender] >= _value && balanceOf[_to] + _value >= balanceOf[_to]);
+
+    /* Add and subtract new balances */
+    balanceOf[msg.sender] -= _value;
+    balanceOf[_to] += _value;
+}
+
+If a balance reaches the maximum uint value (2^256) it will circle back to zero which checks for
+the condition. This may or may not be relevant, depending on the implementation. Think about
+whether or not the uint value has an opportunity to approach such a large number. Think about how
+the uint variable changes state, and who has authority to make such changes. If any user can call
+functions which update the uint value, it's more vulnerable to attack. If only an admin has
+access to change the variable's state, you might be safe. If a user can increment by only 1 at a
+time, you are probably also safe because there is no feasible way to reach this limit.
+The same is true for underflow. If a uint is made to be less than zero, it will cause an underflow
+and get set to its maximum value.
+Be careful with the smaller data-types like uint8, uint16, uint24...etc: they can even more easily
+hit their maximum value.
+
+Warning
+Be aware there are around 20 cases for overflow and underflow.
+One simple solution to mitigate the common mistakes for overflow and underflow is to use
+SafeMath.sol
+library
+for arithmetic functions. Solidity automatically reverts on integer overflow and underflow, as of
+version 0.8.0.
+See SWC-101
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/attacks/denial-of-service/,"
+Denial of Service
+DoS with (Unexpected) revert¶
+Consider a simple auction contract:
+// INSECURE
+contract Auction {
+    address currentLeader;
+    uint highestBid;
+
+    function bid() payable {
+        require(msg.value > highestBid);
+
+        require(currentLeader.send(highestBid)); // Refund the old leader, if it fails then revert
+
+        currentLeader = msg.sender;
+        highestBid = msg.value;
+    }
+}
+
+If attacker bids using a smart contract which has a fallback function that reverts any payment, the
+attacker can win any auction. When it tries to refund the old leader, it reverts if the refund
+fails. This means that a malicious bidder can become the leader while making sure that any refunds
+to their address will always fail. In this way, they can prevent anyone else from calling the
+bid() function, and stay the leader forever. A recommendation is to set up a
+pull payment system instead, as
+described earlier.
+Another example is when a contract may iterate through an array to pay users (e.g., supporters in a
+crowdfunding contract). It's common to want to make sure that each payment succeeds. If not, one
+should revert. The issue is that if one call fails, you are reverting the whole payout system,
+meaning the loop will never complete. No one gets paid because one address is forcing an error.
+address[] private refundAddresses;
+mapping (address => uint) public refunds;
+
+// bad
+function refundAll() public {
+    for(uint x; x < refundAddresses.length; x++) { // arbitrary length iteration based on how many addresses participated
+        require(refundAddresses[x].send(refunds[refundAddresses[x]])) // doubly bad, now a single failure on send will hold up all funds
+    }
+}
+
+Again, the recommended solution is to
+favor pull over push payments.
+See SWC-113
+DoS with Block Gas Limit¶
+Each block has an upper bound on the amount of gas that can be spent, and thus the amount
+computation that can be done. This is the Block Gas Limit. If the gas spent exceeds this limit, the
+transaction will fail. This leads to a couple of possible Denial of Service vectors:
+Gas Limit DoS on a Contract via Unbounded Operations¶
+You may have noticed another problem with the previous example: by paying out to everyone at once,
+you risk running into the block gas limit.
+This can lead to problems even in the absence of an intentional attack. However, it's especially
+bad if an attacker can manipulate the amount of gas needed. In the case of the previous example,
+the attacker could add a bunch of addresses, each of which needs to get a very small refund. The
+gas cost of refunding each of the attacker's addresses could, therefore, end up being more than the
+gas limit, blocking the refund transaction from happening at all.
+This is another reason to
+favor pull over push payments.
+If you absolutely must loop over an array of unknown size, then you should plan for it to
+potentially take multiple blocks, and therefore require multiple transactions. You will need to
+keep track of how far you've gone, and be able to resume from that point, as in the following
+example:
+struct Payee {
+    address addr;
+    uint256 value;
+}
+
+Payee[] payees;
+uint256 nextPayeeIndex;
+
+function payOut() {
+    uint256 i = nextPayeeIndex;
+    while (i < payees.length && gasleft() > 200000) {
+      payees[i].addr.send(payees[i].value);
+      i++;
+    }
+    nextPayeeIndex = i;
+}
+
+You will need to make sure that nothing bad will happen if other transactions are processed while
+waiting for the next iteration of the payOut() function. So only use this pattern if absolutely
+necessary.
+Gas Limit DoS on the Network via Block Stuffing¶
+Even if your contract does not contain an unbounded loop, an attacker can prevent other
+transactions from being included in the blockchain for several blocks by placing computationally
+intensive transactions with a high enough gas price.
+To do this, the attacker can issue several transactions which will consume the entire gas limit,
+with a high enough gas price to be included as soon as the next block is mined. No gas price can
+guarantee inclusion in the block, but the higher the price is, the higher is the chance.
+If the attack succeeds, no other transactions will be included in the block. Sometimes, an
+attacker's goal is to block transactions to a specific contract prior to specific time.
+This attack was conducted on Fomo3D, a
+gambling app. The app was designed to reward the last address that purchased a ""key"". Each key
+purchase extended the timer, and the game ended once the timer went to 0. The attacker bought a key
+and then stuffed 13 blocks in a row until the timer was triggered and the payout was released.
+Transactions sent by attacker took 7.9 million gas on each block, so the gas limit allowed a few
+small ""send"" transactions (which take 21,000 gas each), but disallowed any calls to the buyKey()
+function (which costs 300,000+ gas).
+A Block Stuffing attack can be used on any contract requiring an action within a certain time
+period. However, as with any attack, it is only profitable when the expected reward exceeds its
+cost. The cost of this attack is directly proportional to the number of blocks which need to be
+stuffed. If a large payout can be obtained by preventing actions from other participants, your
+contract will likely be targeted by such an attack.
+See SWC-128
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/attacks/griefing,"
+This attack may be possible on a contract which accepts generic data and uses it to make a call
+another contract (a 'sub-call') via the low level address.call() function, as is often the case
+with multisignature and transaction relayer contracts.
+If the call fails, the contract has two options:
+
+revert the whole transaction
+continue execution.
+
+Take the following example of a simplified Relayer contract which continues execution regardless
+of the outcome of the subcall:
+contract Relayer {
+    mapping (bytes => bool) executed;
+
+    function relay(bytes _data) public {
+        // replay protection; do not call the same transaction twice
+        require(executed[_data] == 0, ""Duplicate call"");
+        executed[_data] = true;
+        innerContract.call(bytes4(keccak256(""execute(bytes)"")), _data);
+    }
+}
+
+This contract allows transaction relaying. Someone who wants to make a transaction but can't
+execute it by himself (e.g. due to the lack of ether to pay for gas) can sign data that he wants to
+pass and transfer the data with his signature over any medium. A third party ""forwarder"" can then
+submit this transaction to the network on behalf of the user.
+If given just the right amount of gas, the Relayer would complete execution recording the
+_dataargument in the executed mapping, but the subcall would fail because it received
+insufficient gas to complete execution.
+
+Note
+When a contract makes a sub-call to another contract, the EVM limits the gas forwarded to
+to 63/64 of the remaining gas,
+
+An attacker can use this to censor transactions, causing them to fail by sending them with a low
+amount of gas. This attack is a form of ""griefing"": It
+doesn't directly benefit the attacker, but causes grief for the victim. A dedicated attacker,
+willing to consistently spend a small amount of gas could theoretically censor all transactions
+this way, if they were the first to submit them to Relayer.
+One way to address this is to implement logic requiring forwarders to provide enough gas to finish
+the subcall. If the miner tried to conduct the attack in this scenario, the require statement
+would fail and the inner call would revert. A user can specify a minimum gasLimit along with the
+other data (in this example, typically the _gasLimit value would be verified by a signature, but
+that is omitted for simplicity in this case).
+// contract called by Relayer
+contract Executor {
+    function execute(bytes _data, uint _gasLimit) {
+        require(gasleft() >= _gasLimit);
+        ...
+    }
+}
+
+Another solution is to permit only trusted accounts to relay the transaction.
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/attacks/force-feeding/,"
+Force Feeding
+Forcing a smart contract to hold an Ether balance can influence its internal accounting and security assumptions.
+There are multiple ways a smart contract can receive Ether. The hierarchy is as follows:
+
+Check whether a payable external receive function is defined.
+If not, check whether a payable external fallback function is defined.
+Revert.
+
+The precedence of each function is explained in this great graphic from the Solidity by Example article:
+Which function is called, fallback() or receive()?
+
+           send Ether
+               |
+         msg.data is empty?
+              / \
+            yes  no
+            /     \
+receive() exists?  fallback()
+         /   \
+        yes   no
+        /      \
+    receive()   fallback()
+
+Consider the following example:
+pragma solidity ^0.8.13;
+
+contract Vulnerable {
+    receive() external payable {
+        revert();
+    }
+
+    function somethingBad() external {
+        require(address(this).balance > 0);
+        // Do something bad
+    }
+}
+
+The contract's logic seemingly disallows direct payments and prevents ""something bad"" from happening.
+However, calling revert in both fallback and receive cannot prevent the contract from receiving Ether.
+The following techniques can be used to force-feed Ether to a smart contract.
+Selfdestruct¶
+When the SELFDESTRUCT opcode is called, funds of the calling address are sent to the address on the stack, and execution is immediately halted.
+Since this opcode works on the EVM-level, Solidity-level functions that might block the receipt of Ether will not be executed.
+Pre-calculated Deployments¶
+Additionally, the target address of newly deployed smart contracts is generated in a deterministic fashion.
+The address generation can be looked up in any EVM implementation, such as the py-evm reference implementation by the Ethereum Foundation:
+def generate_contract_address(address: Address, nonce: int) -> Address:
+    return force_bytes_to_address(keccak(rlp.encode([address, nonce])))
+
+An attacker can send funds to this address before the deployment has happened.
+This is also illustrated by this 2017 Underhanded Solidity Contest submission.
+Block Rewards and Coinbase¶
+Depending on the attacker's capabilities, they can also start proof-of-work mining.
+By setting the target address to their coinbase, block rewards will be added to its balance.
+As this is yet another EVM-level capability, checks performed by Solidity are ineffective.
+Solution¶
+The above effects illustrate that relying on exact comparisons to the contract's Ether balance is unreliable.
+The smart contract's business logic must consider that the actual balance associated with it can be higher than the internal accounting's value.
+In general, we strongly advise against using the contract's balance as a guard.
+More information can be found in SWC-132.
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/attacks/deprecated/,"
+Deprecated/Historical
+These are attacks which are no longer possible due to changes in the protocol or improvements to
+solidity. They are recorded here for posterity and awareness.
+Call Depth Attack (deprecated)¶
+As of the EIP 150 hardfork, call depth attacks are
+no longer
+relevant*
+(all gas would be consumed well before reaching the 1024 call depth limit).
+Constantinople Reentrancy Attack¶
+On January 16th, 2019, Constantinople protocol upgrade was delayed due to a security vulnerability
+enabled by EIP 1283. EIP 1283: Net gas metering for
+SSTORE without dirty maps proposes changes to reduce excessive gas costs on dirty storage writes.
+This change led to possibility of a new reentrancy vector making previously known secure withdrawal
+patterns (.send() and .transfer()) unsafe in specific
+situations*,
+where the attacker could hijack the control flow and use the remaining gas enabled by EIP 1283,
+leading to vulnerabilities due to reentrancy.
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/security-tools/visualization/,"
+
+Solidity Visual Developer
+  - This extension contributes security centric syntax and semantic highlighting, a detailed class
+  outline and advanced Solidity code insights to Visual Studio Code
+Sūrya - Utility tool for smart contract systems, offering a
+  number of visual outputs and information about the contracts' structure. Also supports querying
+  the function call graph.
+Solgraph - Generates a DOT graph that visualizes
+  function control flow of a Solidity contract and highlights potential security vulnerabilities.
+EVM Lab - Rich tool package to interact with the EVM.
+  Includes a VM, Etherchain API, and a trace-viewer.
+ethereum-graph-debugger - A graphical EVM
+  debugger. Displays the entire program control flow graph.
+Piet - Web application helping understand smart contract
+  architectures. Offers graphical representation and inspection of smart contracts as well as a
+  markdown documentation generator.
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/security-tools/static-and-dynamic-analysis/,"
+
+MythX - MythX is a professional-grade cloud service that uses symbolic
+  analysis and input fuzzing to
+  detect common security bugs
+  and
+  verify the correctness of smart contract code.
+  Using MythX requires an API key from mythx.io.
+Mythril - The Swiss army knife for smart contract
+  security.
+Slither - Static analysis framework with detectors for
+  many common Solidity issues. It has taint and value tracking capabilities and is written in
+  Python.
+Contract-Library - Decompiler and security analysis tool for all
+  deployed contracts.
+MadMax - Static analysis tool for gas DoS
+  vulnerabilities.
+Gigahorse - Fast binary lifter and program
+  analysis framework written in Datalog.
+Echidna - The only available fuzzer for Ethereum
+  software. Uses property testing to generate malicious inputs that break smart contracts.
+Manticore - Dynamic binary analysis tool with
+  EVM support.
+Oyente - Analyze Ethereum code to find common
+  vulnerabilities, based on this paper.
+Securify - Fully automated online static analyzer for
+  smart contracts, providing a security report based on vulnerability patterns.
+SmartCheck - Static analysis of Solidity source code for security
+  vulnerabilities and best practices.
+Octopus - Security Analysis tool for Blockchain Smart
+  Contracts with support of EVM and (e)WASM.
+sFuzz - Efficient fuzzer inspired from AFL to find common
+  vulnerabilities.
+Vertigo - Mutation Testing for Ethereum Smart Contracts.
+SolidityScan - Vulnerability Scanner for Solidity Smart Contracts with over 200+ exploit and CVEs, misconfigurations, and gas optimization modules.
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/security-tools/classification/,"
+
+SWC-registry - SWC definitions and a
+  large repository of crafted and real-world samples of vulnerable smart contracts.
+SWC Pages - The SWC-registry repo
+  published on Github Pages
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/security-tools/testing/,"
+
+solidity-coverage - Code coverage for Solidity
+  testing.
+solidity-shell - An interactive Solidity shell with lightweight session recording and remote compiler support.
+chisel - Chisel is a fast, utilitarian, and verbose solidity REPL. It is heavily inspired by the incredible work done in soli and solidity-shell!
+soli - Solidity REPL
+
+"
+smart-contract-security-best-practices-2,https://consensys.github.io/smart-contract-best-practices/security-tools/linters-and-formatters/,"
+Linters improve code quality by enforcing rules for style and composition, making code easier to
+read and review.
+
+Ethlint - Yet another Solidity linting.
+Solhint - A linter for Solidity that provides both
+  Security and Style Guide validations.
+Prettier +
+  Solidity Plugin - Prettier
+  enforces basic style conventions in your code.
+
+"
