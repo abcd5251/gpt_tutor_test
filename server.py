@@ -78,7 +78,7 @@ async def single_respond(question):
 @app.get("/single_respond")
 async def single_respond(question, code_context, program_language):
     respond = first_send(question, code_context, program_language)
-    return respond
+    return {"code":0, "data":respond}
 
 
 @app.get("/second_respond")
@@ -86,7 +86,7 @@ async def second_respond(question, first_answer):
     index_name = "data.csv"
     df = pd.read(index_name)
     respond = refine_reply(question, list(df["content"]), first_answer)
-    return respond
+    return {"code":0, "data":respond}
 
 
 """
