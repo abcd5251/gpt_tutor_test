@@ -1,0 +1,51 @@
+"The goal of this level is to send some balance to the contract. 
+The caveat is this is an empty contract without any functions, fallbacks, etc. Don't be fooled by the cute cat. 
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+contract Force {/*
+
+                   MEOW ?
+         /\_/\   /
+    ____/ o o \
+  /~____  =ø= /
+ (______)__m_m)
+
+*/}
+
+The concept behind this level is how we can forcefully send Ether to a contract. Let's dive in. 
+There are currently three ways in which you can forcefully send Ether to a contract even when it does not have any implementations to receive funds. They are:
+selfdestruct()
+selfdestruct()
+Let's make use of our newly acquired concepts and forcefully send some Ether. The easiest way is by making use of a selfdestruct() function. 
+selfdestruct()
+selfdestruct()
+It is a function which is used to delete a contract from the blockchain and remove it's code and storage. Here's how it looks:
+selfdestruct(addr);
+
+Whenever this is called, the Ether stored in the contract from which it is being called will be sent to the addr mentioned in the arguments. 
+addr
+Therefore, to finish this level, we just need to deploy a contract, fund it with some Ether, and use a selfdestruct() with the address of the Ethernaut's instance to forcefully send the balance to that contract. 
+selfdestruct()
+Here's how our exploit code looks:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+contract Forced{
+    constructor () public payable {
+        selfdestruct(0x570F2d712F9247d8eeaC3bf9ef1300b1b29cF480);
+    }
+}
+
+Let's deploy this contract using the following command. 
+forge create Forced --private-key $PKEY --rpc-url $RPC_URL --value 0.00001ether
+
+I've created a simple contract that has a payable constructor. It means I can send some Ether at the time of deployment. This Ether will then be forwarded to the instance address mentioned in the selfdestruct() call and our contract will be destroyed. 
+selfdestruct()
+
+The new balance of the Ethernaut's contract can be checked on Etherscan as a result of our selfdestruct() call:
+selfdestruct()
+
+The instance can be submitted to finish the level. 
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+selfdestruct()"

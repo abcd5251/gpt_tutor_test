@@ -1,0 +1,73 @@
+"This level requires us to become the owner of the contract. Plain and simple. Or is it? 
+To exploit this, you have to first know the difference between tx.origin and msg.sender. 
+Let's dive in. 
+tx.origin
+msg.sender
+tx.origin
+msg.sender
+Let me simplify this using an infographic :
+
+A
+tx.origin
+msg.sender
+A
+A
+B
+B
+tx.origin
+msg.sender
+A
+This means that the value of tx.origin does not change and is constant. It takes the address of the user or contract who initiates the transaction whereas msg.seder is the address of the intermediate contract or user that called the function. 
+tx.origin
+msg.seder
+Now that the distinction is made, let's look into the contract logic. 
+function changeOwner(address _owner) public {
+    if (tx.origin != msg.sender) {
+        owner = _owner;
+    }
+}
+
+The function changeOwner() has public visibility which means that it can be called by anyone. 
+changeOwner()
+public
+It has a  validation condition that checks if the tx.origin is not equal to msg.sender. If this is true, then sets the new owner to the address passed in the function arguments. 
+tx.origin
+msg.sender
+So to exploit this level, we just need to make sure that our tx.origin and msg.sender do not match when the Ethernaut's instance receives the function call to changeOwner(). 
+tx.origin
+msg.sender
+changeOwner()
+To bypass this validation, as explained above, we can make use of an intermediary contract A, to make the changeOwner() call to contract B (Ethernaut's contract). 
+A
+changeOwner()
+B
+We won't be using foundry scripts since it will be simpler and easier to just deploy a contract on the Rinkeby network and make a call to the deployed contract. 
+The PoC code is inside src/level04. Here's how it looks:
+src/level04
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""../instances/Ilevel04.sol"";
+
+contract Tele {
+    Telephone level4 = Telephone(0xf2585aB001D77CEF708d2E435D60F9Dbd4fC4aB4);
+
+    function exploit() external {
+        level4.changeOwner(0xEAce4b71CA1A128e8B562561f46896D55B9B0246);     
+    }
+}
+
+This contract just makes a call to the changeOwner() function of Ethernaut's instance with our wallet's address as the parameter so we can become the new owner. 
+changeOwner()
+We will deploy the contract using the following command: 
+forge create Tele --private-key $PKEY --rpc-url $RPC_URL
+
+To make a call to our exploit function:
+cast send 0x3C4AaE7bce13f0fdE603F45Cff878F714359fEE2 ""exploit()"" --private-key $PKEY --rpc-url $RPC_URL
+
+
+Once this is done, we will become the new owner by bypassing the tx.origin != msg.sender validation. The instance can now be submitted to finish the level. 
+tx.origin != msg.sender
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+Whenever you think of making use of tx.origin in a contract, make sure it can't be abused in phishing attacks like the one mentioned on Solidity By Example.
+tx.origin"

