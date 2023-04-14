@@ -1,0 +1,196 @@
+"OpenZeppelin's Ethernaut is a Web3/Solidity-based wargame that provides Capture the Flag (CTF) styled challenges where you have to go through their levels, read the smart contract code provided to you, and either claim the ownership, drain all the Ether from the contract or compromise the contract according to their level objectives.
+This will be the first article in a series of blog posts where I go through each level talking about how to compromise their contracts and complete the challenges. 
+I'll be making use of Foundry to write my exploit proof of concept codes for all the levels. 
+Foundry is a smart contract development toolchain. It manages your dependencies, compiles your project, runs tests, deploys, and lets you interact with the chain from the command line and via Solidity scripts.
+This is the first level of Ethernaut. It explains the basics of getting started, the things you need to know, and the wallet you'll need for the challenges. 
+Ethernaut works in such a way that when you click on Get new instance, it deploys the shown Solidity contract's Bytecode to an address on the Rinkbey Testnet. 
+Get new instance
+You can interact with this instance of the deployed contract using your console or your own contract deployment on the Testnet. Web3 wraps an ABI around this contract's instance and provides a bridge that allows communication. 
+
+Setting up Metamask - This is the wallet you'll use to store your cryptocurrencies. We'll use the Rinkbey Test Network or Goerli for this CTF. (Since Rinkeby is deprecated) 
+This article explains the process really well - coin98.net/add-rinkeby-to-metamask
+Rinkbey Test Network
+Goerli
+Fire up that Console - You can query information about the current level and balances among other things using your console. 
+Some commands to help get started - 
+player
+await getBalance(player)
+help()
+Get some Testnet funds - 
+You can interact with the contract's functions using await contract.function_name() from your browser's console. 
+await contract.function_name()
+The level tells you to call the contract.info() function. When it's called, it just goes on returning whatever is stored in the code (this will be revealed once you complete the level). 
+contract.info()
+It can be seen below that the function asks the user to call different functions and in the end requires them to submit a password. 
+Maybe there's a password() function too somewhere in the contract that returns a password? 
+password()
+When you list out all the callable functions in the contract using await contract., you can see the password function as well. And when it is called, it'll return the password which can be submitted in the final function call. 
+await contract.
+Go ahead and submit the instance after completing the transaction to finish your first Ethernaut level. 
+
+Once this is done, you'll see the full contract code. The part which we are interested in is the last function that we called - authenticate(). 
+authenticate()
+Here's a snippet from their contract.
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+contract Instance {
+
+    string public password;
+    uint8 public infoNum = 42;
+    string public theMethodName = 'The method name is method7123949.';
+    bool private cleared = false;
+
+    // constructor
+    constructor(string memory _password) public {
+        password = _password;
+    }
+
+    ...
+
+    ...
+
+    function authenticate(string memory passkey) public {
+        if(keccak256(abi.encodePacked(passkey)) == keccak256(abi.encodePacked(password))) {
+            cleared = true;
+        }
+    }
+
+The authenticate function validates if the user-supplied passkey is the same as the one stored inside the password variable which was set inside the constructor while contract creation. 
+passkey
+password
+If they match, the variable cleared is set to true, and the level is completed. This is what we need to accomplish. 
+cleared
+true
+I'll be using Foundry to create a PoC code. We'll use it to directly make contract calls to the instance address on the Goerli Testnet. This approach will prove beneficial when in later stages, the challenges get a bit more complex and you can't finish them using just the console. Better learn some Solidity development before moving forward. 
+Foundry installation instructions can be found here.
+forge init
+The file foundry.toml houses the configuration for the project. We need to point this to the Goerli Testnet to interact with Ethernaut's deployed contract. Here's my foundry.toml file: 
+foundry.toml
+foundry.toml
+ [profile.default]
+ src = 'src'
+ out = 'out'
+ libs = ['lib']
+
+ eth_rpc_url = 'https://eth-goerli.g.alchemy.com/v2/<alchemy_api_key>'
+ etherscan_api_key = '<etherscan_api_key>'
+
+In addition to this, you can also just pass the parameters in the CLI command with --private-key $PKEY --rpc-url $RPC_URL
+--private-key $PKEY --rpc-url $RPC_URL
+We'll create a folder called instances to store the code for all the levels. 
+instances
+We'll be using scripts to interact with the deployed Ethernaut contracts. A good thing about Foundry scripts is that you can code this in Solidity unlike other frameworks like Brownie. You also have control over which private key/address to use to initiate the transaction which means essentially the control over msg.sender. 
+msg.sender
+We'll write our test scripts in the test folder and the final PoC codes in the script folder. Here's how my folder structure looks (Github Repository):
+test
+script
+
+We are using Forge's standard Test library to write our test scripts. More info on writing test cases can be found in the official Documentation.
+This will be our first test script.  
+pragma solidity ^0.6.0;
+
+import ""../instances/Ilevel00.sol"";
+import ""forge-std/Test.sol"";
+
+contract Attacker is Test {
+    Instance level0 = Instance(0x879A7D9b82862eba53B2B5294CADd808630060B4);
+
+    function test() external{
+        vm.startBroadcast();
+
+        level0.password(); // query password to verify
+        level0.authenticate(level0.password()); //call authenticate function with the password
+
+        vm.stopBroadcast();
+    }
+
+}
+
+vm.startBroadcast()
+test()
+test
+In the above script, we are calling the authenticate() function and passing the value of the password obtained from the password() function in it. This should be enough to complete the level. 
+authenticate()
+password()
+The level0 parameter contains the address of the instance returned by Ethernaut. It can be obtained from the console using the command instance. 
+level0
+instance
+Sidenote: The reason we are able to call the password() function, even when there's no such function but a variable, is because Solidity automatically creates getter functions for public variables. 
+password()
+The tests can be run using the following command:
+forge test --match-path test/test00.sol -vvvv
+
+The returned value can be seen in the hex format. We can make use of the following command to view it in ASCII - 
+cast --to-ascii 0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000a65746865726e6175743000000000000000000000000000000000000000000000
+
+
+Once we confirm that the test cases are working, it's time to broadcast them on the blockchain using the following script and command:
+forge script ./script/level00.sol --private-key $PKEY --broadcast -vvvv --rpc-url $RPC_URL
+
+pragma solidity ^0.6.0;
+
+import ""../instances/Ilevel00.sol"";
+import ""forge-std/Script.sol"";
+
+contract Attacker is Script {
+    Instance level0 = Instance(0x879A7D9b82862eba53B2B5294CADd808630060B4);
+
+    function run() external{
+        vm.startBroadcast();
+        level0.password();
+        level0.authenticate(level0.password());
+        vm.stopBroadcast();
+    }
+
+}
+
+Note that Test.sol has been replaced with Script.sol in the import statement and the function name has been changed to run(). By default, scripts are executed by calling the function named run, our entry-point. More on Solidity scripting using Foundry can be found here. 
+Test.sol
+Script.sol
+run()
+
+Once this is done, the instance can be submitted to complete the level. 
+Let's say we want to deploy our code on the Goerli network and use the deployed contract to interact with the Ethernaut instance, we can make use of the following process. 
+Note that in this case, the caller's address will be the address of your deployed contract and not your Externally Owned Account (EOA). 
+Here's the Solidity code we will be using. This is saved in the folder src/level00.sol.
+src/level00.sol
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""../instances/Ilevel00.sol"";
+
+contract Attacker {
+    Instance level0 = Instance(0x879A7D9b82862eba53B2B5294CADd808630060B4);
+
+    function exploit() external {
+        level0.authenticate(level0.password());
+    }
+}
+
+You don't have to use any Foundry libraries for this as this will be a normal solidity code. 
+Run the command forge create Attacker --private-key $PKEY with your wallet's private key stored in the PKEY variable. 
+forge create Attacker --private-key $PKEY
+PKEY
+ Once this is done, the deployed contract's address will be shown.
+ 
+Now to check if everything is working as expected, let's make a function call to our function exploit(). cast can be used for this. 
+exploit()
+cast
+ cast call 0x86FEaE3720D72Be78e74a521CF42df9eF01670e8 ""exploit()"" --private-key $PKEY
+
+ Here, we specify the deployed address, and the function to call, along with our private key. 
+ The cast call method just performs a call without publishing the transaction to the blockchain. It is useful to check the value returned by a function. In this case, there's none since we are just executing the external call. To sign and publish the transaction, we can use cast send. 
+cast call
+cast send
+Now, we can just publish the transaction and Submit the instance to finish the level. 
+ cast send 0xB25219C8bd214813733a4F73595a2FaeF2e59d2F ""exploit()"" --private-key $PKEY --gas-limit 100000
+
+
+Note the extra --gas-limit 100000 parameter at the end. I had to increase the gas limit because after multiple failed transactions, and going through Etherscan, I came to know that the internal calls were running out of Gas. 
+--gas-limit 100000
+This is how it looked on Etherscan:
+
+It is always a good idea to query the transactions on Etherscan. It helps a lot in debugging and knowing what went wrong. 
+All the code used in this series can be found on my Github:
+github.com/az0mb13/ethernaut-foundry"

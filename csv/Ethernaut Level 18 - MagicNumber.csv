@@ -1,0 +1,85 @@
+"This level wants us to provide it with a magic number that will magically solve the instance, but our code size should only be 10 opcodes. 
+To get through this level, we must know the fabled assembly. Let's dive in.
+To solve this, there's a size restriction of 10 opcodes, i.e., 10 bytes since each opcode is 1 byte. Therefore, our solver should be of at most 10 bytes and it should return 42 (0x2a). 
+We need to write two sets of bytecodes:
+Let's look at the Runtime opcodes first. We are using Ethereum Docs for opcode reference. 
+We need to do the following steps to create our runtime opcode:
+Push and store our value (0x2a) in the memory
+ To store the value, we'll use MSTORE(p, v) where p is the position or offset and v is the value. Since MSTORE expects the value to be already stored in the memory, we need to push it first using the PUSH1(value) opcode. We have to push both the value and the position where it'll be stored in the memory, therefore, we'll need 2 PUSH1 opcodes. 
+p
+v
+ 1. 0x60 - PUSH1 --> PUSH(0x2a) --> 0x602a (Pushing 2a or 42)
+ 2. 0x60 - PUSH1 --> PUSH(0x80) --> 0x6080 (Pushing an arbitrary selected memory slot 80)
+ 3. 0x52 - MSTORE --> MSTORE --> 0x52 (Store value p=0x2a at position v=0x80 in memory)
+
+Return the stored value
+ Once we are done with the PUSH and MSTORE, it's time to return the value using RETURN(p, s) where p is the offset or position of our data stored in the memory and s is the length/size of our stored data. Therefore, we'll again need 2 PUSH1 opcodes. 
+p
+s
+ 1. 0x60 - PUSH1 --> PUSH(0x20) --> 0x6020 (Size of value is 32 bytes)
+ 2. 0x60 - PUSH1 --> PUSH(0x80) --> 0x6080 (Value was stored in slot 0x80)
+ 3. 0xf3 - RETURN --> RETURN --> 0xf3 (Return value at p=0x80 slot and of size s=0x20)
+
+We can obtain the value of bytecodes from the Docs mentioned above. Our final runtime opcode will be: 602a60805260206080f3.
+602a60805260206080f3
+Let's take a look at the initialization opcode needed. These will be responsible for loading our runtime opcodes in memory and returning it to the EVM. 
+To copy code, we need to use the CODECOPY(t, f, s) opcode which takes 3 arguments. 
+t
+f
+s
+602a60805260206080f3
+1. 0x60 - PUSH1 --> PUSH(0x0a) --> 0x600a (`s=0x0a` or 10 bytes)
+2. 0x60 - PUSH1 --> PUSH(0x??) --> 0x60?? (`f` - This is not known yet)
+3. 0x60 - PUSH1 --> PUSH(0x00) --> 0x6000 (`t=0x00` - arbitrary chosen memory location)
+4. 0x39 - CODECOPY --> CODECOPY --> 0x39 (Calling the CODECOPY with all the arguments)
+
+Now, to return the runtime opcode to the EVM: 
+1. 0x60 - PUSH1 --> PUSH(0x0a) --> 0x600a (Size of opcode is 10 bytes)
+2. 0x60 - PUSH1 --> PUSH(0x00) --> 0x6000 (Value was stored in slot 0x00)
+3. 0xf3 - RETURN --> RETURN --> 0xf3 (Return value at p=0x00 slot and of size s=0x0a)
+
+The bytecode for the Initialization opcode will become 600a60__600039600a6000f3 which is 12 bytes in total. This means the missing value for the starting position for the runtime opcode f will be index 12 or 0x0c, making our final bytecode 600a600c600039600a6000f3.
+600a60__600039600a6000f3
+f
+600a600c600039600a6000f3
+Once we have both the bytecodes, we can combine them to get the final bytecode which can be used to deploy the contract. 
+602a60805260206080f3 + 600a600c600039600a6000f3 = 600a600c600039600a6000f3602a60505260206050f3
+602a60805260206080f3
+600a600c600039600a6000f3
+600a600c600039600a6000f3602a60505260206050f3
+Here's what our exploit script looks like:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel18.sol"";
+
+contract POC is Script {
+
+    MagicNum level18 = MagicNum(0x636f1d8922D192D9F3d894C89EA83f4d34921e1E);
+    function run() external{
+        vm.startBroadcast();
+        bytes memory code = ""\x60\x0a\x60\x0c\x60\x00\x39\x60\x0a\x60\x00\xf3\x60\x2a\x60\x80\x52\x60\x20\x60\x80\xf3"";
+        address solver;
+
+        assembly {
+            solver := create(0, add(code, 0x20), mload(code))
+        }
+        level18.setSolver(solver);
+        vm.stopBroadcast();
+    }
+}
+
+We are storing the bytecode generated above in a code parameter. Using assembly, we are creating a solver contract. The create opcode takes 3 inputs - value, offset, and length and returns an address of the deployed contract which is then passed into the setSolver() function of the Ethernaut's instance. 
+code
+solver
+create
+setSolver()
+Let's execute the script using the following command:
+forge script ./script/level18.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL -vvvv
+
+We can see that 10 bytes of code are generated on the new address. The instance can now be submitted to finish the level. 
+
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+My article on setting up your workspace to get started with Ethernaut using Foundry and Solidity - blog.dixitaditya.com/getting-started-with-e..
+The contract's business logic and gas usage can heavily be customized by directly coding in the assembly language but it might also introduce a range of vulnerabilities so special attention must be paid before using it in production code. "

