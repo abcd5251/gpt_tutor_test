@@ -1,4 +1,5 @@
-"This is a simple game in which whoever sends an amount of ether that is larger than the current prize becomes the new king. In such an event, the overthrown king gets paid the new prize. 
+event,content_url,content
+Ethernaut Level 09 - King,https://blog.dixitaditya.com/ethernaut-level-09-king,"This is a simple game in which whoever sends an amount of ether that is larger than the current prize becomes the new king. In such an event, the overthrown king gets paid the new prize. 
 Your goal is to break the game. When you submit this instance, the level is going to try and reclaim the kingship. If you could prevent this from happening and stay the king, you win. Let's see how we can compromise the logic. 
 receive() external payable {
     require(msg.value >= prize || msg.sender == owner); // check if sufficient ether is being sent

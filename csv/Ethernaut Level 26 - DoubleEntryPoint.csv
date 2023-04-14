@@ -1,4 +1,5 @@
-"This level consists of multiple contracts that interact together. One of those contracts is called the CryptoVault. Our task is to find a bug in the CryptoVault and protect the contract from being drained of tokens. 
+event,content_url,content
+Ethernaut Level 26 - DoubleEntryPoint,https://blog.dixitaditya.com/ethernaut-level-26-doubleentrypoint,"This level consists of multiple contracts that interact together. One of those contracts is called the CryptoVault. Our task is to find a bug in the CryptoVault and protect the contract from being drained of tokens. 
 CryptoVault
 CryptoVault
 This level features a CryptoVault with special functionality, the sweepToken function. This is a common function used to retrieve tokens stuck in a contract. The CryptoVault operates with an underlying token that can't be swept, as it is an important core logic component of the CryptoVault. Any other tokens can be swept.

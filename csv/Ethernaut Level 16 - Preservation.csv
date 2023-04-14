@@ -1,4 +1,5 @@
-"This level wants us to become the new owner to complete the instance. 
+event,content_url,content
+Ethernaut Level 16 - Preservation,https://blog.dixitaditya.com/ethernaut-level-16-preservation,"This level wants us to become the new owner to complete the instance. 
 This is similar to other levels where we solved challenges related to delegate calls and how they can be used to preserve the state and storage. It is recommended to go through levels 6 and 12 before starting with this one. Let's dive in.
 We learned in levels 6 and 12 about how delegate calls can be used to make external calls to other contracts. This is mostly used in library calls and the storage changes are replicated. 
 A delegate call is a special low-level call in Solidity to make external calls to another contract. Solidity By Example does an excellent job of explaining this. 

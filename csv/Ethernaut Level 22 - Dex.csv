@@ -1,4 +1,5 @@
-"This level is a Dex contract or decentralized exchange platform that deals with token swapping and exchange. Our player has been provided with 10 tokens each of token1 and token2, the two types of tokens handled by the Dex. The Dex contract has a balance of 100 tokens each. 
+event,content_url,content
+Ethernaut Level 22 - Dex,https://blog.dixitaditya.com/ethernaut-level-22-dex,"This level is a Dex contract or decentralized exchange platform that deals with token swapping and exchange. Our player has been provided with 10 tokens each of token1 and token2, the two types of tokens handled by the Dex. The Dex contract has a balance of 100 tokens each. 
 To complete this level, we need to drain either all the tokens from token1 or token2 from the contract. Even though the contract looks bigger than other levels, it is one of the simplest once you get to know the logic and dangers of divisions (**wink wink**) and multiplications in solidity. Let's dive in.
 We will go through each function one by one. 
 function setTokens(address _token1, address _token2) public onlyOwner {

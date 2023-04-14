@@ -1,4 +1,5 @@
-"This level teaches you about constructors in Solidity. Constructor's in older versions of Solidity to be precise. 
+event,content_url,content
+Ethernaut Level 02 - Fallout,https://blog.dixitaditya.com/ethernaut-level-02-fallout,"This level teaches you about constructors in Solidity. Constructor's in older versions of Solidity to be precise. 
 The main objective of this level is to become the owner of the contract. Let's dive in. 
 Constructors are special functions that are executed at the beginning of the deployment of the contract and are only executed once. They can't be called by external or internal users after deployment and is only used to initialize the contract's state. 
 Up to Solidity 0.4.21, the keywords for constructor definition were a tad bit different. To define a constructor, you had to define a function with the same name as that of your contract. Here's how it looked:

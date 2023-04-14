@@ -1,4 +1,5 @@
-"There's a GoodSamaritan contract that holds a lot of tokens and donates 10 tokens to anyone who requests. Our goal is to drain the contract of all the tokens it holds by exploiting something called custom errors that were recently introduced in Solidity. 
+event,content_url,content
+Ethernaut Level 27 - Good Samaritan,https://blog.dixitaditya.com/ethernaut-level-27-good-samaritan,"There's a GoodSamaritan contract that holds a lot of tokens and donates 10 tokens to anyone who requests. Our goal is to drain the contract of all the tokens it holds by exploiting something called custom errors that were recently introduced in Solidity. 
 Since the aftermath of the last level, I'm so glad they gave us an easy one this time.
 GoodSamaritan
 In this level, there are 3 contracts. GoodSamaritan is the one with which we'll be interacting. We can verify this by executing contract.abi in the console.

@@ -1,4 +1,5 @@
-"The goal of this level is to send some balance to the contract. 
+event,content_url,content
+Ethernaut Level 07 - Force,https://blog.dixitaditya.com/ethernaut-level-07-force,"The goal of this level is to send some balance to the contract. 
 The caveat is this is an empty contract without any functions, fallbacks, etc. Don't be fooled by the cute cat. 
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.0;

@@ -1,4 +1,5 @@
-"This level is a token factory contract. The creator has created a new contract using the Recovery Factory contract and deposited some Ether into the newly created contract. They forgot the address of this new contract and our job is to find this lost contract and withdraw the deposited Ether. 
+event,content_url,content
+Ethernaut Level 17 - Recovery,https://blog.dixitaditya.com/ethernaut-level-17-recovery,"This level is a token factory contract. The creator has created a new contract using the Recovery Factory contract and deposited some Ether into the newly created contract. They forgot the address of this new contract and our job is to find this lost contract and withdraw the deposited Ether. 
 We will do this level in two different ways, by using Etherscan and by calculating the address of the lost contract. Let's dive in.
 function destroy(address payable _to) public {
     selfdestruct(_to);

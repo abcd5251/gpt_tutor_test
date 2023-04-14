@@ -1,4 +1,5 @@
-"This level wants us to provide it with a magic number that will magically solve the instance, but our code size should only be 10 opcodes. 
+event,content_url,content
+Ethernaut Level 18 - MagicNumber,https://blog.dixitaditya.com/ethernaut-level-18-magicnumber,"This level wants us to provide it with a magic number that will magically solve the instance, but our code size should only be 10 opcodes. 
 To get through this level, we must know the fabled assembly. Let's dive in.
 To solve this, there's a size restriction of 10 opcodes, i.e., 10 bytes since each opcode is 1 byte. Therefore, our solver should be of at most 10 bytes and it should return 42 (0x2a). 
 We need to write two sets of bytecodes:

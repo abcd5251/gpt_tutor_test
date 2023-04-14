@@ -1,4 +1,5 @@
-"Our objective is to unlock the vault to pass the level, i.e., set the locked to false. Let's dive in. 
+event,content_url,content
+Ethernaut Level 08 - Vault,https://blog.dixitaditya.com/ethernaut-level-08-vault,"Our objective is to unlock the vault to pass the level, i.e., set the locked to false. Let's dive in. 
 locked
 false
 function unlock(bytes32 _password) public {

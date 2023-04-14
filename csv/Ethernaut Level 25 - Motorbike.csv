@@ -1,4 +1,5 @@
-"Our objective for this level is to call selfdestruct() on the implementation contract Engine and make the Proxy contract unusable. Let's see how we can do that. 
+event,content_url,content
+Ethernaut Level 25 - Motorbike,https://blog.dixitaditya.com/ethernaut-level-25-motorbike,"Our objective for this level is to call selfdestruct() on the implementation contract Engine and make the Proxy contract unusable. Let's see how we can do that. 
 selfdestruct()
 Engine
 This level is using a proxy pattern called UUPS (Universal Upgradeable Proxy Standard). The last one which we saw in Level 24 was a Transparent proxy pattern. 

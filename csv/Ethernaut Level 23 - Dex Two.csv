@@ -1,4 +1,5 @@
-"This level is similar to Level 22 - Dex with a small modification in the swap() function. Our player has been provided with 10 tokens each of token1 and token2, the two types of tokens handled by the Dex. The Dex contract has a balance of 100 tokens each.
+event,content_url,content
+Ethernaut Level 23 - Dex Two,https://blog.dixitaditya.com/ethernaut-level-23-dex-two,"This level is similar to Level 22 - Dex with a small modification in the swap() function. Our player has been provided with 10 tokens each of token1 and token2, the two types of tokens handled by the Dex. The Dex contract has a balance of 100 tokens each.
 swap()
 To complete this level, we need to drain all the tokens from Dex Two (both token1 and token2). Let's dive in.
 Before going forward, I would highly recommend doing the Level 22 - Dex before this one as I won't be going over the whole contract as that has been done previously. 

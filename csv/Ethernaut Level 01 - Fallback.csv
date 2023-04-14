@@ -1,4 +1,5 @@
-"This level deals with the fallback functions (receive and fallback) present in Solidity. 
+event,content_url,content
+Ethernaut Level 01 - Fallback,https://blog.dixitaditya.com/ethernaut-level-01-fallback,"This level deals with the fallback functions (receive and fallback) present in Solidity. 
 The main objectives of this level are:
 receive
 fallback

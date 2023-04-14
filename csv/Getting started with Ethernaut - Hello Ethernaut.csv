@@ -1,4 +1,5 @@
-"OpenZeppelin's Ethernaut is a Web3/Solidity-based wargame that provides Capture the Flag (CTF) styled challenges where you have to go through their levels, read the smart contract code provided to you, and either claim the ownership, drain all the Ether from the contract or compromise the contract according to their level objectives.
+event,content_url,content
+Getting started with Ethernaut - Hello Ethernaut,https://blog.dixitaditya.com/getting-started-with-ethernaut-hello-ethernaut,"OpenZeppelin's Ethernaut is a Web3/Solidity-based wargame that provides Capture the Flag (CTF) styled challenges where you have to go through their levels, read the smart contract code provided to you, and either claim the ownership, drain all the Ether from the contract or compromise the contract according to their level objectives.
 This will be the first article in a series of blog posts where I go through each level talking about how to compromise their contracts and complete the challenges. 
 I'll be making use of Foundry to write my exploit proof of concept codes for all the levels. 
 Foundry is a smart contract development toolchain. It manages your dependencies, compiles your project, runs tests, deploys, and lets you interact with the chain from the command line and via Solidity scripts.

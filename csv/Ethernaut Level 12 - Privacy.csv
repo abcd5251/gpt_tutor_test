@@ -1,4 +1,5 @@
-"This level requires us to unlock the contract. The core idea behind this level is nothing stored on the blockchain is private, not even the private variables. 
+event,content_url,content
+Ethernaut Level 12 - Privacy,https://blog.dixitaditya.com/ethernaut-level-12-privacy,"This level requires us to unlock the contract. The core idea behind this level is nothing stored on the blockchain is private, not even the private variables. 
 This is similar to the Level 08 - Vault. To clear this level, you must know how the EVM stores variables. Let's dive in. 
 According to Solidity documentation, statically-sized variables (everything except mapping and dynamically-sized array types) are laid out contiguously in storage starting from position 0. Multiple items that need less than 32 bytes are packed into a single storage slot if possible.
 This means that each variable type in Solidity is stored on storage slots and each slot is 32 bytes in size. If a variable is smaller than 32 bytes, then the EVM tries to pack multiple variables into a single slot to optimize the storage. 

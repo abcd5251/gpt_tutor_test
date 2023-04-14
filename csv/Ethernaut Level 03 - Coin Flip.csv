@@ -1,4 +1,5 @@
-"This is a really cool coin flip game where you'll have to correctly guess the outcome 10 times in a row to win. If you guess wrong, the counter will reset and you'll have to do it all again. 
+event,content_url,content
+Ethernaut Level 03 - Coin Flip,https://blog.dixitaditya.com/ethernaut-level-03-coin-flip,"This is a really cool coin flip game where you'll have to correctly guess the outcome 10 times in a row to win. If you guess wrong, the counter will reset and you'll have to do it all again. 
 So the question is how will you read the mind of the blockchain gods? It's simple. We will look into the source of randomness used in flipping the coin. Let's dive in. 
 The problem with randomness in Ethereum is that Ethereum is a deterministic Turing machine, with no inherent randomness involved. To generate randomness in Ethereum developers often make use of data related to the blocks, i.e., block number, hash, etc. 
 These variables may look random but are actually deterministic and can be exploited if the inputs are known. We will do the same with our Coin Flip contract. 

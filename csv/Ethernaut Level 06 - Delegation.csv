@@ -1,4 +1,5 @@
-"This level wants us to claim the ownership of the contract to win. The concept hidden in this contract is called a Delegate Call or delegatecall(). Let's dive in. 
+event,content_url,content
+Ethernaut Level 06 - Delegation,https://blog.dixitaditya.com/ethernaut-level-06-delegation,"This level wants us to claim the ownership of the contract to win. The concept hidden in this contract is called a Delegate Call or delegatecall(). Let's dive in. 
 delegatecall()
 A delegate call is a special low-level call in Solidity to make external calls to another contract. Solidity By Example does an excellent job of explaining this. 
 Let's assume there are two contracts, similar to the one shown in Ethernaut's Delegation level, contracts A and B.

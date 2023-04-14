@@ -1,4 +1,5 @@
-"This is a rather simple one and the objective is to prevent the owner from withdrawing the funds when they call the withdraw() function. Let's dive in.
+event,content_url,content
+Ethernaut Level 20 - Denial,https://blog.dixitaditya.com/ethernaut-level-20-denial,"This is a rather simple one and the objective is to prevent the owner from withdrawing the funds when they call the withdraw() function. Let's dive in.
 withdraw()
 Let's take a look at the vulnerable code:
 function setWithdrawPartner(address _partner) public {

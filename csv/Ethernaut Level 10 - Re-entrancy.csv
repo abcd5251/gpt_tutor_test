@@ -1,4 +1,5 @@
-"This is by far one of my favorite attacks in Smart Contracts because the repercussions it has could compromise the whole contract, its funds, users, or the ownership, depending on the code logic. 
+event,content_url,content
+Ethernaut Level 10 - Re-entrancy,https://blog.dixitaditya.com/ethernaut-level-10-re-entrancy,"This is by far one of my favorite attacks in Smart Contracts because the repercussions it has could compromise the whole contract, its funds, users, or the ownership, depending on the code logic. 
 The goal of this level is to steal all the funds from the contract.
 To understand this level, we must know what a Reentrancy is. Let's dive in. 
 This is a class of vulnerabilities in smart contracts where attackers recursively call the functions in a vulnerable smart contract, in which there are external calls, before the contract could make sensitive state changes. 

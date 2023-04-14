@@ -1,4 +1,5 @@
-"This level requires us to become the owner of the contract. Plain and simple. Or is it? 
+event,content_url,content
+Ethernaut Level 04 - Telephone,https://blog.dixitaditya.com/ethernaut-level-04-telephone,"This level requires us to become the owner of the contract. Plain and simple. Or is it? 
 To exploit this, you have to first know the difference between tx.origin and msg.sender. 
 Let's dive in. 
 tx.origin
