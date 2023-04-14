@@ -3,6 +3,8 @@ import os
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
+from pydantic import BaseModel
+
 from openai_model import first_send, refine_reply
 import uvicorn
 
@@ -19,6 +21,18 @@ app.add_middleware(
     allow_methods=["*"], 
     allow_headers=["*"]
 )
+
+class single_respond(BaseModel):
+    question : str
+    code_context : str
+    program_language : str
+
+class second_respond(BaseModel):
+    question : str
+    code_context : str
+    previous_answer : str
+    program_language : str
+
 
 """
 def init_chat_model():
@@ -69,17 +83,18 @@ async def single_respond(question):
 """
 
 @app.post("/single_respond/")
-async def single_respond(question, code_context, program_language):
-    respond = first_send(question, code_context, program_language)
+async def single_respond(item: single_respond):
+    respond = first_send(item.question, item.code_context, item.program_language)
     print(respond)
     return {"code":0, "data":respond}
 
 
 @app.post("/second_respond/")
-async def second_respond(question, first_answer):
+# refine_reply(selected_code, full_code, contents : list, previous_answer, program_language)
+async def second_respond(item: second_respond):
     index_name = "data.csv"
     df = pd.read(index_name)
-    respond = refine_reply(question, list(df["content"]), first_answer)
+    respond = refine_reply(item.question, item.code_context, list(df["content"]), item.previous_answer, item.program_language)
     return {"code" : 0, "data" : respond}
 
 
