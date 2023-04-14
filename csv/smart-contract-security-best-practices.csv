@@ -1,0 +1,326 @@
+event,content_url,content
+smart-contract-security-best-practices,https://www.alchemy.com/overviews/smart-contract-security-best-practices,"Blockchain's distinguishing characteristic, smart contracts, allows it to function as more than just a decentralized financial system and a trustless store of value. However, security is a challenge that needs to be solved in a fundamentally new way if blockchain is truly the technology that shifts paradigms.Technically, smart contract security operates using the same principles as software security. A secure application's very first step begins with the code itself because if the code was not written using best programming techniques the attack surface of a prospective attacker increases.This article will focus on explaining smart contracts security, providing a list of patterns and mistakes you should avoid to ensure your Solidity smart contracts code is more secure. What is smart contract security?  On the Ethereum network, smart contracts are in place to manage and execute the blockchain operations that occur when users (addresses) interact with one another. Smart contracts are especially useful when there is a transfer or exchange of funds between two or more parties. Smart contracts increase transparency while decreasing operational costs, and they can also increase efficiency and reduce bureaucratic costs, depending on how they are implemented.Smart contract security refers to the security guidelines and best practices developers, users, and exchanges apply when creating or interacting with smart contracts. Security entails developers examining their code, paying attention to common Solidity mistakes, and guaranteeing that a dapp's security is robust to be mainnet-ready.Why is security important to developers? With vast amounts of value transacted through or locked in smart contracts, they become attractive targets for malicious attacks from hackers. Minor coding errors can lead to huge sums of funds being lost. Since blockchain transactions are irreversible, making sure that a project's code is secure is essential. Blockchain technology's highly secure nature makes it difficult to retrieve funds and resolve issues hence, securing your smart contract.1. Use Delegatecall CarefullyDelegatecall is identical to a message call except that the code at the target address is executed in the context of the calling contract and the values of msg.sender and msg.value are not changed.Delegatecall has been extremely useful because it serves as the foundation for implementing libraries and modularizing code. Delegatecall also allows a contract to dynamically load code from a different address, however it introduces vulnerabilities because a contract essentially allows anyone to do anything they want with their state resulting in unexpected code execution.In the example below, when contract B executes the delegatecall function to contract A, the code of contract A is executed but with contract B’s storage.
+contract A{
+  uint8 public num;
+  address public owner;
+  uint256 public time;
+  string public message;
+  bytes public data;
+
+
+  function callOne() public{
+      num = 100;
+      owner = msg.sender;
+      time = block.timestamp;
+      message = ""Darah"";
+      data = abi.encodePacked(num, msg.sender, block.timestamp);
+
+  }
+
+
+contract B{
+
+  uint8 public num;
+  address public owner;
+  uint256 public time;
+  string public message;
+  bytes public data;
+
+  function callTwo(address contractAddress) public returns(bool){
+
+      (bool success,) = contractAddress.delegatecall(
+          abi.encodeWithSignature(""callOne()"")
+      );
+      }
+     
+}
+delegatecall affects the state variables of the contract that calls a function with delegatecall. The state variables of the contract that holds the functions that are borrowed are not read or written.2. Use a Reentrancy GuardReentrancy is a programming method where an external function call causes the execution of a function to pause. Conditions in the logic of the external function call allow it to call itself repeatedly before the original function execution is finished.A reentrancy attack takes advantage of unprotected external calls and can be a particularly damaging exploit, draining all of the funds in your contract if not handled properly.Here is a simple example of a contract that is susceptible to re-entrancy:
+//Victim
+
+contract Victim {
+  mapping (address => uint) public balances;
+
+function deposit() public payable {
+        balances[msg.sender] += msg.value;
+    }
+
+    function withdraw() public {
+        uint bal = balances[msg.sender];
+        require(bal > 0);
+
+        (bool sent, ) = msg.sender.call{value: bal}("""");
+        require(sent, ""Failed to send Ether"");
+
+        balances[msg.sender] = 0;
+    }
+
+//Attack
+
+contract Attack {
+    Victim public victim;
+    
+    constructor(address _victim) {
+        victim = Victim(_victim);
+    }
+    
+    fallback() external payable {
+        if (address(victim).balance >= 1 ether){
+            victim.withdraw(1 ether);
+        }
+    }
+    
+    function attack() external payable {
+        require(msg.value >= 1 ether);
+        victim.deposit{value: 1 ether}();
+        victim.withdraw(1 ether);
+    }
+}
+A reentrancy guard is a modifier that causes execution to fail whenever a reenterancy act is discovered. This also prevents more than one function from being executed at a time by locking the contract.
+contract ReEntrancyGuard {
+    bool internal locked;
+
+    modifier noReentrant() {
+        require(!locked, ""No re-entrancy"");
+        locked = true;
+        _;
+        locked = false;
+    }
+}
+3. Use msg.sender Instead of tx.origin for AuthenticationIn Solidity, tx.origin is a global variable that returns the address of the account that sent the transaction. Using the tx.origin variable for authorization may expose a contract to compromise if an authorized account calls into a malicious contract.Avoiding the use of tx.origin for authentication purposes is the best method to guard against tx.origin attacks instead use msg.sender in its place.The difference between tx.origin and msg.sender is msg.sender, the owner, can be a contract while tx.origin the owner can never be a contract.
+contract Wallet {
+
+   address owner;
+
+   function Wallet() public {
+       owner = msg.sender;
+   }
+
+   function sendTo(address receiver, uint amount) public {
+       require(tx.origin == owner);
+       (bool success, ) = receiver.call.value(amount)("""");
+       require(success);
+   }
+
+}
+Implementing msg.sender here:
+contract Attack {
+
+   Wallet wallet; 
+   address attack;
+
+   function AttackingContract(address myContractAddress) public {
+       myContract = MyContract(myContractAddress);
+       attacker = msg.sender;
+   }
+
+   function() public {
+       myContract.sendTo(attacker, msg.sender.balance);
+   }
+
+}
+4. Properly Use Solidity Visibility ModifiersFunction visibility can be set to be either internal, external, private, or public. It's crucial to think about which visibility is appropriate for your smart contract function.Here is a brief description of each visibility modifier:Public - can be accessed by the main contract, derived contracts, and third party contractsExternal - can only be called by a third party.Internal - can be called by the main contract and any of its derived contractsPrivate - can only be called by the main contract in which it was specifiedA developer's failure to utilize a visibility modifier frequently results in smart contract attacks. The function is thus by default set to be public, which may result in unintentional state changes.5. Avoid Block Timestamp ManipulationBlock timestamps have been used historically for a number of purposes, including entropy for random numbers locking funds for a set amount of time, and different state-changing, time-dependent conditional statements. Because validators have the capacity to slightly alter timestamps, using block timestamps wrong in smart contracts can be quite risky.The time difference between events can be estimated using block.number and the average block time. However, because block times can change and break functionality, it's best to avoid its use.
+contract MyContract {
+    uint public pastBlockTime; 
+    
+    constructor() public payable {} 
+    
+    function () public payable {
+        require(msg.value == 10 ether); 
+        require(now != pastBlockTime); 
+        pastBlockTime = now;
+        if(now % 15 == 0) { 
+            msg.sender.transfer(this.balance);
+        }
+    }
+}
+6. Avoid Arithmetic Overflow and UnderflowAn integer would automatically roll over to a lower or higher number in Solidity versions prior to 0.8.0. If you decremented 0 by 1 (0-1) on an unsigned number, the outcome would simply be: MAX instead of -1 or an error.
+pragma solidity 0.7.0;
+
+contract MyContract {
+    uint8 public level;
+
+    function decrement() public {
+        myUint8--;
+    }
+
+    function increment() public {
+        myUint8++;
+    }
+}
+The easiest way is to use at least a 0.8 version of the Solidity compiler. In Solidity 0.8, the compiler will automatically take care of checking for overflows and underflows.
+pragma solidity 0.8.0;
+
+contract  {
+    uint8 public level;
+
+    function decrement() public {
+        myUint8--;
+    }
+
+    function increment() public {
+        myUint8++;
+    }
+}
+3 Popular Smart Contract Security ToolsThree of the most popular smart contract security tools are Slither, Mythril, and Securify.1. SlitherSlither is a static analyzer that features more than 40 built-in vulnerability detectors for widespread flaws. Slither executes a number of vulnerability scanners, outputs visual information about the terms of the contract, and offers an API for quickly creating unique studies. This amazing security tool gives developers the ability to identify vulnerabilities, improve their understanding of the code, and quickly prototype unique analysis.‍2. MythrilMythril is an open-source element of MythX and an EVM bytecode security analysis tool that supports smart contracts created for the Tron, Roostock, Vechain, Quorum, and other EVM-compatible blockchains.3. Securify Securify is a smart contract vulnerability checker supported by the Ethereum Foundation and ChainSecurity. This well-known Ethereum smart contract scanner employs context-specific static analysis for more precise security assessments and can find up to 37 smart contract flaws.Secure Your Smart ContractsThe future of blockchain technology is dependent on the developers who work on it. Because smart contract security is widely perceived as blockchain security, the actions of independent developers influence public perception of the blockchain. When creating smart contracts, project teams must consider proper security best practices.Blockchain's distinguishing characteristic, smart contracts, allows it to function as more than just a decentralized financial system and a trustless store of value. However, security is a challenge that needs to be solved in a fundamentally new way if blockchain is truly the technology that shifts paradigms.Technically, smart contract security operates using the same principles as software security. A secure application's very first step begins with the code itself because if the code was not written using best programming techniques the attack surface of a prospective attacker increases.This article will focus on explaining smart contracts security, providing a list of patterns and mistakes you should avoid to ensure your Solidity smart contracts code is more secure. What is smart contract security?  On the Ethereum network, smart contracts are in place to manage and execute the blockchain operations that occur when users (addresses) interact with one another. Smart contracts are especially useful when there is a transfer or exchange of funds between two or more parties. Smart contracts increase transparency while decreasing operational costs, and they can also increase efficiency and reduce bureaucratic costs, depending on how they are implemented.Smart contract security refers to the security guidelines and best practices developers, users, and exchanges apply when creating or interacting with smart contracts. Security entails developers examining their code, paying attention to common Solidity mistakes, and guaranteeing that a dapp's security is robust to be mainnet-ready.Why is security important to developers? With vast amounts of value transacted through or locked in smart contracts, they become attractive targets for malicious attacks from hackers. Minor coding errors can lead to huge sums of funds being lost. Since blockchain transactions are irreversible, making sure that a project's code is secure is essential. Blockchain technology's highly secure nature makes it difficult to retrieve funds and resolve issues hence, securing your smart contract.1. Use Delegatecall CarefullyDelegatecall is identical to a message call except that the code at the target address is executed in the context of the calling contract and the values of msg.sender and msg.value are not changed.Delegatecall has been extremely useful because it serves as the foundation for implementing libraries and modularizing code. Delegatecall also allows a contract to dynamically load code from a different address, however it introduces vulnerabilities because a contract essentially allows anyone to do anything they want with their state resulting in unexpected code execution.In the example below, when contract B executes the delegatecall function to contract A, the code of contract A is executed but with contract B’s storage.
+contract A{
+  uint8 public num;
+  address public owner;
+  uint256 public time;
+  string public message;
+  bytes public data;
+
+
+  function callOne() public{
+      num = 100;
+      owner = msg.sender;
+      time = block.timestamp;
+      message = ""Darah"";
+      data = abi.encodePacked(num, msg.sender, block.timestamp);
+
+  }
+
+
+contract B{
+
+  uint8 public num;
+  address public owner;
+  uint256 public time;
+  string public message;
+  bytes public data;
+
+  function callTwo(address contractAddress) public returns(bool){
+
+      (bool success,) = contractAddress.delegatecall(
+          abi.encodeWithSignature(""callOne()"")
+      );
+      }
+     
+}
+delegatecall affects the state variables of the contract that calls a function with delegatecall. The state variables of the contract that holds the functions that are borrowed are not read or written.2. Use a Reentrancy GuardReentrancy is a programming method where an external function call causes the execution of a function to pause. Conditions in the logic of the external function call allow it to call itself repeatedly before the original function execution is finished.A reentrancy attack takes advantage of unprotected external calls and can be a particularly damaging exploit, draining all of the funds in your contract if not handled properly.Here is a simple example of a contract that is susceptible to re-entrancy:
+//Victim
+
+contract Victim {
+  mapping (address => uint) public balances;
+
+function deposit() public payable {
+        balances[msg.sender] += msg.value;
+    }
+
+    function withdraw() public {
+        uint bal = balances[msg.sender];
+        require(bal > 0);
+
+        (bool sent, ) = msg.sender.call{value: bal}("""");
+        require(sent, ""Failed to send Ether"");
+
+        balances[msg.sender] = 0;
+    }
+
+//Attack
+
+contract Attack {
+    Victim public victim;
+    
+    constructor(address _victim) {
+        victim = Victim(_victim);
+    }
+    
+    fallback() external payable {
+        if (address(victim).balance >= 1 ether){
+            victim.withdraw(1 ether);
+        }
+    }
+    
+    function attack() external payable {
+        require(msg.value >= 1 ether);
+        victim.deposit{value: 1 ether}();
+        victim.withdraw(1 ether);
+    }
+}
+A reentrancy guard is a modifier that causes execution to fail whenever a reenterancy act is discovered. This also prevents more than one function from being executed at a time by locking the contract.
+contract ReEntrancyGuard {
+    bool internal locked;
+
+    modifier noReentrant() {
+        require(!locked, ""No re-entrancy"");
+        locked = true;
+        _;
+        locked = false;
+    }
+}
+3. Use msg.sender Instead of tx.origin for AuthenticationIn Solidity, tx.origin is a global variable that returns the address of the account that sent the transaction. Using the tx.origin variable for authorization may expose a contract to compromise if an authorized account calls into a malicious contract.Avoiding the use of tx.origin for authentication purposes is the best method to guard against tx.origin attacks instead use msg.sender in its place.The difference between tx.origin and msg.sender is msg.sender, the owner, can be a contract while tx.origin the owner can never be a contract.
+contract Wallet {
+
+   address owner;
+
+   function Wallet() public {
+       owner = msg.sender;
+   }
+
+   function sendTo(address receiver, uint amount) public {
+       require(tx.origin == owner);
+       (bool success, ) = receiver.call.value(amount)("""");
+       require(success);
+   }
+
+}
+Implementing msg.sender here:
+contract Attack {
+
+   Wallet wallet; 
+   address attack;
+
+   function AttackingContract(address myContractAddress) public {
+       myContract = MyContract(myContractAddress);
+       attacker = msg.sender;
+   }
+
+   function() public {
+       myContract.sendTo(attacker, msg.sender.balance);
+   }
+
+}
+4. Properly Use Solidity Visibility ModifiersFunction visibility can be set to be either internal, external, private, or public. It's crucial to think about which visibility is appropriate for your smart contract function.Here is a brief description of each visibility modifier:Public - can be accessed by the main contract, derived contracts, and third party contractsExternal - can only be called by a third party.Internal - can be called by the main contract and any of its derived contractsPrivate - can only be called by the main contract in which it was specifiedA developer's failure to utilize a visibility modifier frequently results in smart contract attacks. The function is thus by default set to be public, which may result in unintentional state changes.5. Avoid Block Timestamp ManipulationBlock timestamps have been used historically for a number of purposes, including entropy for random numbers locking funds for a set amount of time, and different state-changing, time-dependent conditional statements. Because validators have the capacity to slightly alter timestamps, using block timestamps wrong in smart contracts can be quite risky.The time difference between events can be estimated using block.number and the average block time. However, because block times can change and break functionality, it's best to avoid its use.
+contract MyContract {
+    uint public pastBlockTime; 
+    
+    constructor() public payable {} 
+    
+    function () public payable {
+        require(msg.value == 10 ether); 
+        require(now != pastBlockTime); 
+        pastBlockTime = now;
+        if(now % 15 == 0) { 
+            msg.sender.transfer(this.balance);
+        }
+    }
+}
+6. Avoid Arithmetic Overflow and UnderflowAn integer would automatically roll over to a lower or higher number in Solidity versions prior to 0.8.0. If you decremented 0 by 1 (0-1) on an unsigned number, the outcome would simply be: MAX instead of -1 or an error.
+pragma solidity 0.7.0;
+
+contract MyContract {
+    uint8 public level;
+
+    function decrement() public {
+        myUint8--;
+    }
+
+    function increment() public {
+        myUint8++;
+    }
+}
+The easiest way is to use at least a 0.8 version of the Solidity compiler. In Solidity 0.8, the compiler will automatically take care of checking for overflows and underflows.
+pragma solidity 0.8.0;
+
+contract  {
+    uint8 public level;
+
+    function decrement() public {
+        myUint8--;
+    }
+
+    function increment() public {
+        myUint8++;
+    }
+}
+3 Popular Smart Contract Security ToolsThree of the most popular smart contract security tools are Slither, Mythril, and Securify.1. SlitherSlither is a static analyzer that features more than 40 built-in vulnerability detectors for widespread flaws. Slither executes a number of vulnerability scanners, outputs visual information about the terms of the contract, and offers an API for quickly creating unique studies. This amazing security tool gives developers the ability to identify vulnerabilities, improve their understanding of the code, and quickly prototype unique analysis.‍2. MythrilMythril is an open-source element of MythX and an EVM bytecode security analysis tool that supports smart contracts created for the Tron, Roostock, Vechain, Quorum, and other EVM-compatible blockchains.3. Securify Securify is a smart contract vulnerability checker supported by the Ethereum Foundation and ChainSecurity. This well-known Ethereum smart contract scanner employs context-specific static analysis for more precise security assessments and can find up to 37 smart contract flaws.Secure Your Smart ContractsThe future of blockchain technology is dependent on the developers who work on it. Because smart contract security is widely perceived as blockchain security, the actions of independent developers influence public perception of the blockchain. When creating smart contracts, project teams must consider proper security best practices."
