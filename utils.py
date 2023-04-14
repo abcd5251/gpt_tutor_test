@@ -5,7 +5,27 @@ from transformers import AutoTokenizer, AutoModel
 import torch
 import torch.nn.functional as F
 from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer, util
 
+def calculate_cosine_code(full_code, contents:list):
+
+
+    model = SentenceTransformer("flax-sentence-embeddings/st-codesearch-distilroberta-base")
+
+    code_emb = model.encode(contents, convert_to_tensor=True)
+
+    while True:
+
+        query_emb = model.encode(full_code, convert_to_tensor=True)
+        hits = util.semantic_search(query_emb, code_emb)[0]
+        top_hit = hits[0]
+
+        print("Cossim: {:.2f}".format(top_hit['score']))
+        print(contents[top_hit['corpus_id']])
+        print("\n\n")
+        break
+
+    return contents[top_hit['corpus_id']]
 
 
 #Mean Pooling - Take attention mask into account for correct averaging

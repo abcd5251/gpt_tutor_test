@@ -3,6 +3,7 @@ import os
 from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 
+from openai_model import first_send, refine_reply
 import uvicorn
 
 import pandas as pd 
@@ -32,19 +33,14 @@ def init_chat_model():
                         presence_penalty = 0.1,
                         init_prompt= True    # system setting
                     )
-
-
 def get_global_variable():
     if my_chat_model is None:
         init_chat_model()
     return my_chat_model
-
 @app.get('/query_llama')
 async def query_from_llama_index(user_query: str):
     try:
-
         index_name = "./documents/data.json"
-
         if os.path.isfile(index_name) is False:
             return "Index file does not exist", 404
         
@@ -54,15 +50,12 @@ async def query_from_llama_index(user_query: str):
     
     except Exception as e:
         return "Error: {}".format(str(e)), 500
-
 @app.get("/query_keyword")
 async def query_from_keyword(user_query: str, my_chat_model = Depends(get_global_variable)):
     try:
         df = pd.read_csv("./documents/data.csv") # read external data
-
     except Exception as e:
         return "File doesn't exists !"
-
     contexts = list(df["content"])
     answer = my_chat_model(user_query, contexts)
     return {"respond" : answer}
@@ -75,18 +68,19 @@ async def single_respond(question):
     return respond
 """
 
-@app.get("/single_respond")
+@app.post("/single_respond/")
 async def single_respond(question, code_context, program_language):
     respond = first_send(question, code_context, program_language)
-    return respond
+    print(respond)
+    return {"code":0, "data":respond}
 
 
-@app.get("/second_respond")
+@app.post("/second_respond/")
 async def second_respond(question, first_answer):
     index_name = "data.csv"
     df = pd.read(index_name)
     respond = refine_reply(question, list(df["content"]), first_answer)
-    return respond
+    return {"code" : 0, "data" : respond}
 
 
 """
@@ -96,9 +90,7 @@ async def refine_answer(user_query, full_code, my_chat_model = Depends(get_globa
     return {"respond" : temp_answer}
     
     try:
-
         index_name = "./documents/data.json"
-
         if os.path.isfile(index_name) is False:
             return "Index file does not exist", 404
         
